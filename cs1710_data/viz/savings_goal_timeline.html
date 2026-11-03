@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Months to Your First $10K</title>
+<meta name="description" content="How many months a typical entry-level salary needs to save a $10,000 emergency fund in 40 U.S. metros, by career field.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    color-scheme: light;
+    --surface:#fcfcfb; --page:#f7f6f2;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+    --series:#3d6fb0; --accent:#c4612f;
+    --control:#ffffff; --control-active:#2f4f7f; --control-active-ink:#ffffff;
+    --tip-bg:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --surface:#1a1a19; --page:#0d0d0d;
+      --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+      --series:#5a8fd0; --accent:#d9733f;
+      --control:#232322; --control-active:#5a8fd0; --control-active-ink:#0d0d0d;
+      --tip-bg:#232322;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface:#1a1a19; --page:#0d0d0d;
+    --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --series:#5a8fd0; --accent:#d9733f;
+    --control:#232322; --control-active:#5a8fd0; --control-active-ink:#0d0d0d;
+    --tip-bg:#232322;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--page);color:var(--ink);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  .viz-root{max-width:1080px;margin:0 auto;padding:28px 16px 48px}
+  header h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:650;letter-spacing:-.01em}
+  header .sub{margin:0;color:var(--ink-2);max-width:72ch}
+  .filters{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin:18px 0 10px}
+  .filters label{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  .filters select{font:inherit;font-size:13px;color:var(--ink);background:var(--control);border:1px solid var(--border);border-radius:6px;padding:6px 28px 6px 10px;min-width:200px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--control)}
+  .seg button{font:inherit;font-size:13px;color:var(--ink-2);background:transparent;border:0;border-right:1px solid var(--border);padding:6px 12px;cursor:pointer}
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--control-active);color:var(--control-active-ink)}
+  .goal{display:flex;align-items:center;gap:8px}
+  .goal input[type=range]{width:150px;accent-color:var(--series)}
+  .goal output{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600;font-size:13px;min-width:62px;text-transform:none;letter-spacing:0}
+  .ghost{font:inherit;font-size:13px;color:var(--ink-2);background:var(--control);border:1px solid var(--border);border-radius:6px;padding:6px 12px;cursor:pointer;margin-left:auto}
+  .ghost[aria-pressed="true"]{background:var(--control-active);color:var(--control-active-ink)}
+  .insight{margin:0 0 14px;color:var(--ink-2);max-width:80ch}
+  .insight strong{color:var(--ink);font-weight:600}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px 10px}
+  .chart-head{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+  .chart-head h2{font-size:15px;margin:0;font-weight:650}
+  .chart-head .note{color:var(--muted);font-size:12px}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--ink-2);font-size:12px;margin:2px 0 6px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--series)}
+  .legend i.acc{background:var(--accent)}
+  .legend i.never{background:transparent;border:2px solid var(--muted);width:9px;height:9px}
+  #chart{position:relative;width:100%}
+  #chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .lane{cursor:pointer}
+  .lane .hit{fill:transparent}
+  .lane:focus{outline:none}
+  .lane:focus .hit, .lane.hover .hit{fill:var(--grid);fill-opacity:.55}
+  .lane .name{fill:var(--ink-2);font-size:12px}
+  .lane .st{fill:var(--muted);font-size:11px}
+  .lane .val{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .lane .stem{stroke:var(--series);stroke-width:2;stroke-linecap:round}
+  .lane .dot{fill:var(--series);stroke:var(--surface);stroke-width:2}
+  .lane.never .stem{stroke:var(--grid)}
+  .lane.never .dot{fill:var(--surface);stroke:var(--muted);stroke-width:2}
+  .lane.pinned .stem{stroke:var(--accent)}
+  .lane.pinned .dot{fill:var(--accent)}
+  .lane.pinned.never .dot{fill:var(--surface);stroke:var(--accent)}
+  .lane.pinned .name,.lane.pinned .val{fill:var(--ink);font-weight:650}
+  .grid line{stroke:var(--grid);stroke-width:1;shape-rendering:crispEdges}
+  .grid line.zero{stroke:var(--axis)}
+  .grid text{fill:var(--muted);font-size:11px}
+  .divider text{fill:var(--ink-2);font-size:12px;font-weight:600}
+  .divider line{stroke:var(--axis);stroke-width:1;shape-rendering:crispEdges}
+  .empty{color:var(--muted);padding:28px 0;text-align:center}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  th{color:var(--ink-2);font-weight:600;font-size:12px}
+  tr.pinned td{color:var(--ink);font-weight:650}
+  .detail{margin-top:14px;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:14px 18px}
+  .detail.idle{border-left-color:var(--axis);color:var(--muted)}
+  .detail h3{margin:0;font-size:17px;font-weight:650}
+  .detail .meta{color:var(--ink-2);font-size:12px;margin:2px 0 10px}
+  .detail .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px 18px}
+  .stat b{display:block;font-size:17px;font-weight:650;color:var(--ink)}
+  .stat span{font-size:12px;color:var(--ink-2)}
+  .budget{margin:12px 0 0;color:var(--ink-2);font-size:12px}
+  .budget b{color:var(--ink);font-weight:600}
+  .source{margin-top:14px;color:var(--muted);font-size:12px;max-width:90ch}
+  .tooltip{position:fixed;z-index:10;pointer-events:none;opacity:0;transition:opacity .1s;
+    background:var(--tip-bg);color:var(--ink);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 6px 24px rgba(0,0,0,.12);padding:10px 12px;font-size:12px;min-width:200px}
+  .tooltip .t{font-weight:650;font-size:13px}
+  .tooltip .m{color:var(--ink-2);margin-bottom:6px}
+  .tooltip .big{font-size:20px;font-weight:650;margin:2px 0 6px}
+  .tooltip .row{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
+  .tooltip .row span:last-child{color:var(--ink-2)}
+  .tooltip .row strong{font-weight:600}
+  @media (max-width:640px){ header h1{font-size:22px} .filters select{min-width:160px} .ghost{margin-left:0} }
+  @media (prefers-reduced-motion: reduce){ .tooltip{transition:none} }
+</style>
+</head>
+<body>
+<main class="viz-root">
+  <header>
+    <h1>How long until your first $10,000?</h1>
+    <p class="sub">Months it takes a new grad on a typical entry-level salary to save an emergency fund in each metro, after paying for a modest single-adult budget. Pick a career field, narrow to a region, or change the goal.</p>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label for="field">Industry <select id="field"></select></label>
+    <div class="seg" id="region" role="group" aria-label="Region"></div>
+    <label class="goal" for="goal">Goal
+      <input type="range" id="goal" min="1000" max="50000" step="500" value="10000" aria-label="Savings goal in dollars">
+      <output id="goalOut" for="goal">$10,000</output>
+    </label>
+    <button class="ghost" id="tableToggle" aria-pressed="false" aria-controls="table">Table view</button>
+  </div>
+
+  <p class="insight" id="insight"></p>
+
+  <section class="card" aria-labelledby="chartTitle">
+    <div class="chart-head">
+      <h2 id="chartTitle">Months to reach the goal</h2>
+      <span class="note" id="note"></span>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><i></i>metro, typical entry salary in the selected field</span>
+      <span><i class="acc"></i>pinned metro</span>
+      <span><i class="never"></i>never: budget exceeds take-home</span>
+    </div>
+    <div id="chart" role="img" aria-label="Sorted lanes of metros with a marker at the month each reaches the savings goal"></div>
+    <table id="table" hidden></table>
+  </section>
+
+  <section class="detail idle" id="detail" aria-live="polite">
+    <div class="head"><div><h3>Click a metro to pin its breakdown</h3><p class="meta">Hover any lane for the numbers; click to keep them here.</p></div></div>
+  </section>
+
+  <p class="source">Savings = estimated monthly take-home at the 25th-percentile wage across 132 bachelor's-entry occupations (BLS OEWS, May 2025; field cuts from the same file) minus EPI's "modest but adequate" single-adult budget excluding taxes (2026 edition, 2025 dollars). Taxes use EPI's effective rate for the metro. The budget assumes car ownership everywhere, so transit-heavy metros such as New York are likely understated. Metros are CBSAs. Months = goal ÷ monthly savings.</p>
+</main>
+<div class="tooltip" id="tip" role="tooltip"></div>
+
+<script>const DATA = {"cities":[{"city":"New York","state":"NY","region":"Northeast","salary":86665,"take":5363,"savings":211,"expenses":5152,"housing":2406,"food":426,"transport":693,"health":748,"other":879,"tax":0.2574,"rentShare":0.449,"jobs":1707710,"unemp":4.8,"young":0.131},{"city":"Boston","state":"MA","region":"Northeast","salary":85997,"take":5401,"savings":395,"expenses":5006,"housing":2263,"food":418,"transport":1080,"health":413,"other":832,"tax":0.2463,"rentShare":0.419,"jobs":570980,"unemp":4.2,"young":0.143},{"city":"Philadelphia","state":"PA","region":"Northeast","salary":72530,"take":4876,"savings":1168,"expenses":3708,"housing":1372,"food":388,"transport":1028,"health":374,"other":546,"tax":0.1933,"rentShare":0.281,"jobs":500350,"unemp":4.5,"young":0.127},{"city":"Pittsburgh","state":"PA","region":"Northeast","salary":67156,"take":4553,"savings":1430,"expenses":3123,"housing":998,"food":378,"transport":986,"health":335,"other":427,"tax":0.1865,"rentShare":0.219,"jobs":178980,"unemp":4.2,"young":0.118},{"city":"Washington","state":"DC","region":"South","salary":83873,"take":5330,"savings":719,"expenses":4611,"housing":2012,"food":413,"transport":1045,"health":388,"other":753,"tax":0.2374,"rentShare":0.377,"jobs":733600,"unemp":3.8,"young":0.129},{"city":"Baltimore","state":"MD","region":"South","salary":75514,"take":4979,"savings":1238,"expenses":3741,"housing":1407,"food":384,"transport":1036,"health":358,"other":556,"tax":0.2088,"rentShare":0.283,"jobs":265850,"unemp":3.9,"young":0.123},{"city":"Richmond","state":"VA","region":"South","salary":69361,"take":4502,"savings":582,"expenses":3920,"housing":1488,"food":376,"transport":1089,"health":389,"other":579,"tax":0.2211,"rentShare":0.331,"jobs":126060,"unemp":3.4,"young":0.124},{"city":"Raleigh","state":"NC","region":"South","salary":70146,"take":4554,"savings":484,"expenses":4070,"housing":1533,"food":382,"transport":1109,"health":451,"other":594,"tax":0.2209,"rentShare":0.337,"jobs":155480,"unemp":3.2,"young":0.13},{"city":"Charlotte","state":"NC","region":"South","salary":71796,"take":4660,"savings":581,"expenses":4079,"housing":1586,"food":375,"transport":1044,"health":465,"other":609,"tax":0.2212,"rentShare":0.34,"jobs":260010,"unemp":3.9,"young":0.131},{"city":"Atlanta","state":"GA","region":"South","salary":68828,"take":4423,"savings":275,"expenses":4148,"housing":1591,"food":378,"transport":1054,"health":514,"other":611,"tax":0.2288,"rentShare":0.36,"jobs":533890,"unemp":3.4,"young":0.132},{"city":"Nashville","state":"TN","region":"South","salary":65439,"take":4496,"savings":309,"expenses":4187,"housing":1589,"food":388,"transport":1078,"health":519,"other":614,"tax":0.1755,"rentShare":0.353,"jobs":173320,"unemp":3.0,"young":0.14},{"city":"Miami","state":"FL","region":"South","salary":64895,"take":4463,"savings":298,"expenses":4165,"housing":1711,"food":395,"transport":925,"health":479,"other":654,"tax":0.1748,"rentShare":0.383,"jobs":398950,"unemp":3.3,"young":0.117},{"city":"Tampa","state":"FL","region":"South","salary":65276,"take":4520,"savings":553,"expenses":3967,"housing":1566,"food":376,"transport":950,"health":472,"other":603,"tax":0.169,"rentShare":0.346,"jobs":249670,"unemp":4.0,"young":0.119},{"city":"Orlando","state":"FL","region":"South","salary":65432,"take":4500,"savings":337,"expenses":4163,"housing":1636,"food":372,"transport":1041,"health":492,"other":623,"tax":0.1748,"rentShare":0.364,"jobs":218090,"unemp":3.9,"young":0.132},{"city":"New Orleans","state":"LA","region":"South","salary":62039,"take":4202,"savings":907,"expenses":3295,"housing":1071,"food":365,"transport":955,"health":457,"other":446,"tax":0.1872,"rentShare":0.255,"jobs":64940,"unemp":4.4,"young":0.118},{"city":"Dallas","state":"TX","region":"South","salary":73171,"take":5075,"savings":1151,"expenses":3924,"housing":1531,"food":342,"transport":1010,"health":458,"other":582,"tax":0.1677,"rentShare":0.302,"jobs":743850,"unemp":3.9,"young":0.141},{"city":"Houston","state":"TX","region":"South","salary":70134,"take":4919,"savings":1455,"expenses":3464,"housing":1226,"food":321,"transport":1015,"health":422,"other":480,"tax":0.1583,"rentShare":0.249,"jobs":562330,"unemp":4.5,"young":0.135},{"city":"Austin","state":"TX","region":"South","salary":74903,"take":5181,"savings":1186,"expenses":3995,"housing":1549,"food":334,"transport":1062,"health":467,"other":584,"tax":0.1699,"rentShare":0.299,"jobs":271140,"unemp":3.5,"young":0.147},{"city":"San Antonio","state":"TX","region":"South","salary":66508,"take":4675,"savings":1363,"expenses":3312,"housing":1116,"food":296,"transport":1028,"health":433,"other":438,"tax":0.1565,"rentShare":0.239,"jobs":185790,"unemp":4.0,"young":0.14},{"city":"Chicago","state":"IL","region":"Midwest","salary":71495,"take":4667,"savings":889,"expenses":3778,"housing":1458,"food":385,"transport":947,"health":416,"other":572,"tax":0.2167,"rentShare":0.312,"jobs":736330,"unemp":4.7,"young":0.134},{"city":"Minneapolis","state":"MN","region":"Midwest","salary":75714,"take":5097,"savings":1545,"expenses":3552,"housing":1220,"food":405,"transport":1061,"health":361,"other":504,"tax":0.1922,"rentShare":0.239,"jobs":364590,"unemp":3.7,"young":0.126},{"city":"Detroit","state":"MI","region":"Midwest","salary":73667,"take":5066,"savings":1968,"expenses":3098,"housing":991,"food":351,"transport":973,"health":366,"other":417,"tax":0.1747,"rentShare":0.196,"jobs":353600,"unemp":5.0,"young":0.124},{"city":"Columbus","state":"OH","region":"Midwest","salary":68604,"take":4707,"savings":1347,"expenses":3360,"housing":1104,"food":355,"transport":996,"health":453,"other":453,"tax":0.1766,"rentShare":0.235,"jobs":206690,"unemp":4.3,"young":0.136},{"city":"Cleveland","state":"OH","region":"Midwest","salary":67794,"take":4682,"savings":1634,"expenses":3048,"housing":881,"food":389,"transport":975,"health":409,"other":394,"tax":0.1713,"rentShare":0.188,"jobs":167280,"unemp":4.0,"young":0.12},{"city":"Cincinnati","state":"OH","region":"Midwest","salary":67501,"take":4659,"savings":1589,"expenses":3070,"housing":883,"food":346,"transport":1024,"health":435,"other":382,"tax":0.1717,"rentShare":0.19,"jobs":186130,"unemp":4.4,"young":0.13},{"city":"Indianapolis","state":"IN","region":"Midwest","salary":65012,"take":4414,"savings":1271,"expenses":3143,"housing":955,"food":336,"transport":1031,"health":420,"other":401,"tax":0.1853,"rentShare":0.216,"jobs":168090,"unemp":3.4,"young":0.133},{"city":"Milwaukee","state":"WI","region":"Midwest","salary":68661,"take":4630,"savings":1513,"expenses":3117,"housing":939,"food":364,"transport":951,"health":457,"other":405,"tax":0.1908,"rentShare":0.203,"jobs":136980,"unemp":3.5,"young":0.13},{"city":"St. Louis","state":"MO","region":"Midwest","salary":65579,"take":4430,"savings":1250,"expenses":3180,"housing":951,"food":373,"transport":1018,"health":427,"other":411,"tax":0.1893,"rentShare":0.215,"jobs":228470,"unemp":4.0,"young":0.122},{"city":"Kansas City","state":"MO","region":"Midwest","salary":66984,"take":4504,"savings":1121,"expenses":3383,"housing":1074,"food":371,"transport":1032,"health":458,"other":449,"tax":0.1932,"rentShare":0.238,"jobs":201660,"unemp":3.9,"young":0.127},{"city":"Denver","state":"CO","region":"West","salary":81171,"take":5320,"savings":1186,"expenses":4134,"housing":1639,"food":384,"transport":1047,"health":436,"other":628,"tax":0.2135,"rentShare":0.308,"jobs":360160,"unemp":4.0,"young":0.141},{"city":"Salt Lake City","state":"UT","region":"West","salary":69244,"take":4575,"savings":944,"expenses":3631,"housing":1243,"food":356,"transport":1050,"health":485,"other":496,"tax":0.2071,"rentShare":0.272,"jobs":157550,"unemp":3.6,"young":0.158},{"city":"Phoenix","state":"AZ","region":"West","salary":69810,"take":4717,"savings":840,"expenses":3877,"housing":1530,"food":343,"transport":1021,"health":402,"other":582,"tax":0.1892,"rentShare":0.324,"jobs":385290,"unemp":3.8,"young":0.139},{"city":"Las Vegas","state":"NV","region":"West","salary":64891,"take":4543,"savings":944,"expenses":3599,"housing":1316,"food":349,"transport":1007,"health":410,"other":517,"tax":0.1599,"rentShare":0.29,"jobs":127600,"unemp":5.6,"young":0.128},{"city":"Los Angeles","state":"CA","region":"West","salary":79003,"take":5139,"savings":824,"expenses":4315,"housing":1856,"food":367,"transport":1004,"health":398,"other":690,"tax":0.2194,"rentShare":0.361,"jobs":1042900,"unemp":5.3,"young":0.135},{"city":"San Diego","state":"CA","region":"West","salary":85616,"take":5406,"savings":509,"expenses":4897,"housing":2145,"food":369,"transport":1121,"health":481,"other":781,"tax":0.2423,"rentShare":0.397,"jobs":276240,"unemp":4.6,"young":0.143},{"city":"San Francisco","state":"CA","region":"West","salary":101743,"take":6340,"savings":1168,"expenses":5172,"housing":2275,"food":469,"transport":968,"health":608,"other":852,"tax":0.2522,"rentShare":0.359,"jobs":524390,"unemp":4.4,"young":0.122},{"city":"San Jose","state":"CA","region":"West","salary":128515,"take":7881,"savings":2278,"expenses":5603,"housing":2608,"food":414,"transport":1139,"health":503,"other":938,"tax":0.2641,"rentShare":0.331,"jobs":332340,"unemp":4.3,"young":0.143},{"city":"Sacramento","state":"CA","region":"West","salary":83133,"take":5405,"savings":1082,"expenses":4323,"housing":1679,"food":384,"transport":1044,"health":577,"other":640,"tax":0.2198,"rentShare":0.311,"jobs":189730,"unemp":5.0,"young":0.128},{"city":"Seattle","state":"WA","region":"West","salary":94423,"take":6337,"savings":1435,"expenses":4902,"housing":2238,"food":421,"transport":1020,"health":398,"other":826,"tax":0.1946,"rentShare":0.353,"jobs":520530,"unemp":4.6,"young":0.139},{"city":"Portland","state":"OR","region":"West","salary":81063,"take":5045,"savings":865,"expenses":4180,"housing":1628,"food":408,"transport":1050,"health":461,"other":632,"tax":0.2531,"rentShare":0.323,"jobs":223550,"unemp":4.9,"young":0.127}],"byField":{"Atlanta":{"Business & Finance":{"salary":63042,"take":4051,"savings":-97,"jobs":200120},"Education":{"salary":54282,"take":3489,"savings":-659,"jobs":90250},"Computer & Math":{"salary":92013,"take":5913,"savings":1765,"jobs":86980},"Healthcare":{"salary":78323,"take":5034,"savings":886,"jobs":65460},"Engineering & Architecture":{"salary":80670,"take":5184,"savings":1036,"jobs":27960},"Arts, Design & Media":{"salary":51761,"take":3327,"savings":-821,"jobs":18880},"Sales":{"salary":60130,"take":3864,"savings":-284,"jobs":14640},"Community & Social Service":{"salary":52554,"take":3377,"savings":-771,"jobs":11800},"Science":{"salary":72994,"take":4691,"savings":543,"jobs":10050},"Management":{"salary":92970,"take":5975,"savings":1827,"jobs":7470},"Other":{"salary":47110,"take":3028,"savings":-1120,"jobs":280}},"Austin":{"Business & Finance":{"salary":66961,"take":4632,"savings":637,"jobs":83520},"Computer & Math":{"salary":93124,"take":6442,"savings":2447,"jobs":65860},"Education":{"salary":57341,"take":3967,"savings":-28,"jobs":34740},"Engineering & Architecture":{"salary":97616,"take":6753,"savings":2758,"jobs":24480},"Healthcare":{"salary":77992,"take":5395,"savings":1400,"jobs":21390},"Sales":{"salary":64069,"take":4432,"savings":437,"jobs":13850},"Arts, Design & Media":{"salary":49808,"take":3445,"savings":-550,"jobs":11140},"Management":{"salary":82440,"take":5703,"savings":1708,"jobs":6040},"Science":{"salary":64294,"take":4448,"savings":453,"jobs":5920},"Community & Social Service":{"salary":50244,"take":3476,"savings":-519,"jobs":4200}},"Baltimore":{"Business & Finance":{"salary":69873,"take":4607,"savings":866,"jobs":87530},"Computer & Math":{"salary":97899,"take":6455,"savings":2714,"jobs":47040},"Education":{"salary":61310,"take":4042,"savings":301,"jobs":40640},"Healthcare":{"salary":77685,"take":5122,"savings":1381,"jobs":36680},"Engineering & Architecture":{"salary":93477,"take":6163,"savings":2422,"jobs":20570},"Arts, Design & Media":{"salary":54294,"take":3580,"savings":-161,"jobs":7980},"Sales":{"salary":58481,"take":3856,"savings":115,"jobs":7820},"Science":{"salary":75216,"take":4959,"savings":1218,"jobs":7540},"Community & Social Service":{"salary":53068,"take":3499,"savings":-242,"jobs":7160},"Management":{"salary":92220,"take":6080,"savings":2339,"jobs":2780},"Other":{"salary":47770,"take":3150,"savings":-591,"jobs":110}},"Boston":{"Business & Finance":{"salary":78417,"take":4925,"savings":-81,"jobs":182790},"Computer & Math":{"salary":111002,"take":6972,"savings":1966,"jobs":96030},"Education":{"salary":72357,"take":4545,"savings":-461,"jobs":76560},"Healthcare":{"salary":89368,"take":5613,"savings":607,"jobs":75460},"Engineering & Architecture":{"salary":98973,"take":6216,"savings":1210,"jobs":53270},"Science":{"salary":75514,"take":4743,"savings":-263,"jobs":23210},"Sales":{"salary":79578,"take":4998,"savings":-8,"jobs":22940},"Arts, Design & Media":{"salary":59736,"take":3752,"savings":-1254,"jobs":21020},"Community & Social Service":{"salary":60332,"take":3789,"savings":-1217,"jobs":11770},"Management":{"salary":130250,"take":8181,"savings":3175,"jobs":7570},"Office & Admin":{"salary":57645,"take":3621,"savings":-1385,"jobs":310},"Other":{"salary":46080,"take":2894,"savings":-2112,"jobs":50}},"Charlotte":{"Business & Finance":{"salary":69608,"take":4518,"savings":439,"jobs":93200},"Computer & Math":{"salary":94012,"take":6101,"savings":2022,"jobs":48920},"Education":{"salary":47354,"take":3073,"savings":-1006,"jobs":34530},"Healthcare":{"salary":78317,"take":5083,"savings":1004,"jobs":30090},"Engineering & Architecture":{"salary":82393,"take":5347,"savings":1268,"jobs":15480},"Sales":{"salary":65580,"take":4256,"savings":177,"jobs":13210},"Arts, Design & Media":{"salary":47492,"take":3082,"savings":-997,"jobs":9630},"Community & Social Service":{"salary":50088,"take":3251,"savings":-828,"jobs":5510},"Management":{"salary":79870,"take":5184,"savings":1105,"jobs":5450},"Science":{"salary":68017,"take":4414,"savings":335,"jobs":3960},"Office & Admin":{"salary":44570,"take":2893,"savings":-1186,"jobs":30}},"Chicago":{"Business & Finance":{"salary":67912,"take":4433,"savings":655,"jobs":232060},"Education":{"salary":61369,"take":4006,"savings":228,"jobs":146590},"Healthcare":{"salary":80234,"take":5237,"savings":1459,"jobs":110560},"Computer & Math":{"salary":89873,"take":5866,"savings":2088,"jobs":95850},"Engineering & Architecture":{"salary":81632,"take":5329,"savings":1551,"jobs":45970},"Sales":{"salary":70152,"take":4579,"savings":801,"jobs":30380},"Arts, Design & Media":{"salary":50782,"take":3315,"savings":-463,"jobs":27110},"Community & Social Service":{"salary":51466,"take":3359,"savings":-419,"jobs":21390},"Management":{"salary":82330,"take":5374,"savings":1596,"jobs":13850},"Science":{"salary":72494,"take":4732,"savings":954,"jobs":12090},"Office & Admin":{"salary":38170,"take":2492,"savings":-1286,"jobs":260},"Other":{"salary":48570,"take":3170,"savings":-608,"jobs":220}},"Cincinnati":{"Business & Finance":{"salary":61629,"take":4254,"savings":1184,"jobs":59350},"Healthcare":{"salary":77181,"take":5327,"savings":2257,"jobs":32210},"Education":{"salary":53100,"take":3665,"savings":595,"jobs":29210},"Computer & Math":{"salary":85392,"take":5894,"savings":2824,"jobs":22950},"Engineering & Architecture":{"salary":85238,"take":5884,"savings":2814,"jobs":17390},"Arts, Design & Media":{"salary":44461,"take":3069,"savings":-1,"jobs":7970},"Sales":{"salary":61386,"take":4237,"savings":1167,"jobs":5080},"Community & Social Service":{"salary":48719,"take":3363,"savings":293,"jobs":4510},"Science":{"salary":65686,"take":4534,"savings":1464,"jobs":4330},"Management":{"salary":82790,"take":5715,"savings":2645,"jobs":3050},"Other":{"salary":59030,"take":4075,"savings":1005,"jobs":50},"Office & Admin":{"salary":45760,"take":3159,"savings":89,"jobs":30}},"Cleveland":{"Business & Finance":{"salary":60966,"take":4210,"savings":1162,"jobs":50650},"Healthcare":{"salary":77952,"take":5383,"savings":2335,"jobs":31870},"Education":{"salary":59722,"take":4124,"savings":1076,"jobs":27630},"Computer & Math":{"salary":86147,"take":5949,"savings":2901,"jobs":20860},"Engineering & Architecture":{"salary":82091,"take":5669,"savings":2621,"jobs":13120},"Arts, Design & Media":{"salary":42502,"take":2935,"savings":-113,"jobs":7200},"Community & Social Service":{"salary":48112,"take":3323,"savings":275,"jobs":5750},"Sales":{"salary":57164,"take":3948,"savings":900,"jobs":4270},"Science":{"salary":63762,"take":4403,"savings":1355,"jobs":3300},"Management":{"salary":80450,"take":5556,"savings":2508,"jobs":2630}},"Columbus":{"Business & Finance":{"salary":64319,"take":4413,"savings":1053,"jobs":65590},"Education":{"salary":55898,"take":3836,"savings":476,"jobs":37500},"Healthcare":{"salary":77107,"take":5291,"savings":1931,"jobs":34000},"Computer & Math":{"salary":89492,"take":6141,"savings":2781,"jobs":25960},"Engineering & Architecture":{"salary":81560,"take":5596,"savings":2236,"jobs":14070},"Arts, Design & Media":{"salary":46227,"take":3172,"savings":-188,"jobs":8590},"Community & Social Service":{"salary":49493,"take":3396,"savings":36,"jobs":5800},"Science":{"salary":69523,"take":4770,"savings":1410,"jobs":5760},"Sales":{"salary":59502,"take":4083,"savings":723,"jobs":5380},"Management":{"salary":90850,"take":6234,"savings":2874,"jobs":4000},"Other":{"salary":68020,"take":4667,"savings":1307,"jobs":40}},"Dallas":{"Business & Finance":{"salary":65109,"take":4516,"savings":592,"jobs":243950},"Computer & Math":{"salary":94692,"take":6568,"savings":2644,"jobs":151780},"Education":{"salary":59338,"take":4116,"savings":192,"jobs":116420},"Healthcare":{"salary":76806,"take":5327,"savings":1403,"jobs":88160},"Engineering & Architecture":{"salary":90048,"take":6246,"savings":2322,"jobs":50160},"Sales":{"salary":69762,"take":4839,"savings":915,"jobs":31460},"Arts, Design & Media":{"salary":47793,"take":3315,"savings":-609,"jobs":24230},"Management":{"salary":81000,"take":5618,"savings":1694,"jobs":17110},"Science":{"salary":66469,"take":4610,"savings":686,"jobs":10500},"Community & Social Service":{"salary":48621,"take":3372,"savings":-552,"jobs":9980},"Office & Admin":{"salary":41600,"take":2885,"savings":-1039,"jobs":60},"Other":{"salary":47120,"take":3268,"savings":-656,"jobs":40}},"Denver":{"Business & Finance":{"salary":74908,"take":4910,"savings":776,"jobs":142580},"Computer & Math":{"salary":109970,"take":7208,"savings":3074,"jobs":57100},"Education":{"salary":61533,"take":4033,"savings":-101,"jobs":37850},"Engineering & Architecture":{"salary":94927,"take":6222,"savings":2088,"jobs":34380},"Healthcare":{"salary":82228,"take":5389,"savings":1255,"jobs":33730},"Arts, Design & Media":{"salary":58943,"take":3863,"savings":-271,"jobs":13790},"Sales":{"salary":78439,"take":5141,"savings":1007,"jobs":13520},"Community & Social Service":{"salary":53905,"take":3533,"savings":-601,"jobs":10710},"Science":{"salary":77412,"take":5074,"savings":940,"jobs":9150},"Management":{"salary":102710,"take":6732,"savings":2598,"jobs":7250},"Office & Admin":{"salary":44960,"take":2947,"savings":-1187,"jobs":70},"Other":{"salary":46140,"take":3024,"savings":-1110,"jobs":30}},"Detroit":{"Business & Finance":{"salary":64802,"take":4457,"savings":1359,"jobs":103000},"Engineering & Architecture":{"salary":92916,"take":6390,"savings":3292,"jobs":62790},"Healthcare":{"salary":78275,"take":5383,"savings":2285,"jobs":50410},"Computer & Math":{"salary":91180,"take":6271,"savings":3173,"jobs":49130},"Education":{"salary":56024,"take":3853,"savings":755,"jobs":46640},"Arts, Design & Media":{"salary":49617,"take":3412,"savings":314,"jobs":13820},"Community & Social Service":{"salary":48500,"take":3336,"savings":238,"jobs":9740},"Sales":{"salary":75625,"take":5201,"savings":2103,"jobs":8970},"Science":{"salary":64676,"take":4448,"savings":1350,"jobs":4900},"Management":{"salary":84230,"take":5793,"savings":2695,"jobs":3970},"Office & Admin":{"salary":47303,"take":3253,"savings":155,"jobs":180},"Other":{"salary":56170,"take":3863,"savings":765,"jobs":50}},"Houston":{"Business & Finance":{"salary":65267,"take":4578,"savings":1114,"jobs":174660},"Education":{"salary":57008,"take":3999,"savings":535,"jobs":111180},"Healthcare":{"salary":77899,"take":5464,"savings":2000,"jobs":75200},"Computer & Math":{"salary":86228,"take":6048,"savings":2584,"jobs":62930},"Engineering & Architecture":{"salary":93331,"take":6546,"savings":3082,"jobs":57360},"Sales":{"salary":63079,"take":4424,"savings":960,"jobs":19280},"Arts, Design & Media":{"salary":42502,"take":2981,"savings":-483,"jobs":17620},"Science":{"salary":72071,"take":5055,"savings":1591,"jobs":17380},"Management":{"salary":81780,"take":5736,"savings":2272,"jobs":16500},"Community & Social Service":{"salary":48391,"take":3394,"savings":-70,"jobs":10120},"Other":{"salary":65510,"take":4595,"savings":1131,"jobs":100}},"Indianapolis":{"Business & Finance":{"salary":61039,"take":4144,"savings":1001,"jobs":52330},"Healthcare":{"salary":74456,"take":5055,"savings":1912,"jobs":30450},"Education":{"salary":50598,"take":3435,"savings":292,"jobs":25920},"Computer & Math":{"salary":78333,"take":5318,"savings":2175,"jobs":21830},"Engineering & Architecture":{"salary":80740,"take":5482,"savings":2339,"jobs":11720},"Arts, Design & Media":{"salary":46396,"take":3150,"savings":7,"jobs":8450},"Science":{"salary":63343,"take":4300,"savings":1157,"jobs":5640},"Sales":{"salary":63576,"take":4316,"savings":1173,"jobs":5360},"Community & Social Service":{"salary":49332,"take":3349,"savings":206,"jobs":3840},"Management":{"salary":85370,"take":5796,"savings":2653,"jobs":2450},"Other":{"salary":47843,"take":3248,"savings":105,"jobs":100}},"Kansas City":{"Business & Finance":{"salary":64384,"take":4329,"savings":946,"jobs":66620},"Education":{"salary":47394,"take":3186,"savings":-197,"jobs":34330},"Healthcare":{"salary":74517,"take":5010,"savings":1627,"jobs":33700},"Computer & Math":{"salary":86130,"take":5791,"savings":2408,"jobs":27640},"Engineering & Architecture":{"salary":82944,"take":5577,"savings":2194,"jobs":15750},"Arts, Design & Media":{"salary":44384,"take":2984,"savings":-399,"jobs":7740},"Sales":{"salary":69099,"take":4646,"savings":1263,"jobs":5090},"Community & Social Service":{"salary":48423,"take":3256,"savings":-127,"jobs":4590},"Science":{"salary":64322,"take":4325,"savings":942,"jobs":3920},"Management":{"salary":100620,"take":6765,"savings":3382,"jobs":2180},"Office & Admin":{"salary":42920,"take":2886,"savings":-497,"jobs":50},"Other":{"salary":46600,"take":3133,"savings":-250,"jobs":50}},"Las Vegas":{"Business & Finance":{"salary":60020,"take":4202,"savings":603,"jobs":39850},"Education":{"salary":47450,"take":3322,"savings":-277,"jobs":27010},"Healthcare":{"salary":85264,"take":5969,"savings":2370,"jobs":22560},"Computer & Math":{"salary":83247,"take":5828,"savings":2229,"jobs":12470},"Arts, Design & Media":{"salary":47195,"take":3304,"savings":-295,"jobs":6980},"Engineering & Architecture":{"salary":85255,"take":5969,"savings":2370,"jobs":6090},"Sales":{"salary":50302,"take":3522,"savings":-77,"jobs":3840},"Community & Social Service":{"salary":53967,"take":3778,"savings":179,"jobs":3750},"Management":{"salary":93930,"take":6576,"savings":2977,"jobs":3150},"Science":{"salary":66398,"take":4648,"savings":1049,"jobs":1900}},"Los Angeles":{"Business & Finance":{"salary":70086,"take":4559,"savings":244,"jobs":352640},"Education":{"salary":66284,"take":4312,"savings":-3,"jobs":173730},"Computer & Math":{"salary":101767,"take":6620,"savings":2305,"jobs":139390},"Healthcare":{"salary":106015,"take":6896,"savings":2581,"jobs":123320},"Engineering & Architecture":{"salary":97609,"take":6349,"savings":2034,"jobs":76550},"Arts, Design & Media":{"salary":59930,"take":3898,"savings":-417,"jobs":70660},"Community & Social Service":{"salary":55330,"take":3599,"savings":-716,"jobs":42520},"Sales":{"salary":65272,"take":4246,"savings":-69,"jobs":29270},"Science":{"salary":71628,"take":4659,"savings":344,"jobs":23880},"Management":{"salary":100830,"take":6559,"savings":2244,"jobs":10120},"Other":{"salary":46475,"take":3023,"savings":-1292,"jobs":710},"Office & Admin":{"salary":48840,"take":3177,"savings":-1138,"jobs":110}},"Miami":{"Business & Finance":{"salary":62685,"take":4311,"savings":146,"jobs":137460},"Healthcare":{"salary":76166,"take":5238,"savings":1073,"jobs":70860},"Education":{"salary":50299,"take":3459,"savings":-706,"jobs":63480},"Computer & Math":{"salary":86562,"take":5953,"savings":1788,"jobs":48720},"Arts, Design & Media":{"salary":45797,"take":3149,"savings":-1016,"jobs":22270},"Engineering & Architecture":{"salary":75196,"take":5171,"savings":1006,"jobs":21190},"Sales":{"salary":55515,"take":3818,"savings":-347,"jobs":19430},"Community & Social Service":{"salary":46804,"take":3219,"savings":-946,"jobs":9020},"Science":{"salary":58268,"take":4007,"savings":-158,"jobs":6370},"Other":{"salary":39000,"take":2682,"savings":-1483,"jobs":110},"Office & Admin":{"salary":35850,"take":2465,"savings":-1700,"jobs":40}},"Milwaukee":{"Business & Finance":{"salary":63874,"take":4307,"savings":1190,"jobs":45660},"Healthcare":{"salary":79324,"take":5349,"savings":2232,"jobs":25090},"Education":{"salary":53584,"take":3613,"savings":496,"jobs":20040},"Computer & Math":{"salary":84918,"take":5726,"savings":2609,"jobs":17200},"Engineering & Architecture":{"salary":79786,"take":5380,"savings":2263,"jobs":11570},"Arts, Design & Media":{"salary":49256,"take":3321,"savings":204,"jobs":6680},"Sales":{"salary":65868,"take":4442,"savings":1325,"jobs":4080},"Community & Social Service":{"salary":50810,"take":3426,"savings":309,"jobs":3020},"Science":{"salary":64846,"take":4373,"savings":1256,"jobs":1960},"Management":{"salary":100040,"take":6746,"savings":3629,"jobs":1680}},"Minneapolis":{"Business & Finance":{"salary":70813,"take":4767,"savings":1215,"jobs":119650},"Education":{"salary":56332,"take":3792,"savings":240,"jobs":54730},"Computer & Math":{"salary":95749,"take":6446,"savings":2894,"jobs":54420},"Healthcare":{"salary":91026,"take":6128,"savings":2576,"jobs":48090},"Engineering & Architecture":{"salary":89479,"take":6023,"savings":2471,"jobs":32140},"Arts, Design & Media":{"salary":52621,"take":3542,"savings":-10,"jobs":17110},"Community & Social Service":{"salary":57701,"take":3884,"savings":332,"jobs":14060},"Sales":{"salary":69204,"take":4659,"savings":1107,"jobs":11000},"Science":{"salary":75077,"take":5054,"savings":1502,"jobs":9380},"Management":{"salary":102780,"take":6919,"savings":3367,"jobs":3880},"Other":{"salary":71090,"take":4786,"savings":1234,"jobs":130}},"Nashville":{"Business & Finance":{"salary":61591,"take":4232,"savings":45,"jobs":57290},"Healthcare":{"salary":77781,"take":5344,"savings":1157,"jobs":28730},"Education":{"salary":51873,"take":3564,"savings":-623,"jobs":26470},"Computer & Math":{"salary":80224,"take":5512,"savings":1325,"jobs":24320},"Engineering & Architecture":{"salary":80456,"take":5528,"savings":1341,"jobs":9670},"Arts, Design & Media":{"salary":43725,"take":3004,"savings":-1183,"jobs":8680},"Sales":{"salary":57059,"take":3920,"savings":-267,"jobs":7980},"Community & Social Service":{"salary":48834,"take":3355,"savings":-832,"jobs":4950},"Science":{"salary":60345,"take":4146,"savings":-41,"jobs":2740},"Management":{"salary":95670,"take":6573,"savings":2386,"jobs":2460},"Other":{"salary":66550,"take":4573,"savings":386,"jobs":30}},"New Orleans":{"Business & Finance":{"salary":56430,"take":3822,"savings":527,"jobs":20390},"Healthcare":{"salary":71985,"take":4876,"savings":1581,"jobs":12830},"Education":{"salary":51062,"take":3459,"savings":164,"jobs":12540},"Computer & Math":{"salary":72391,"take":4903,"savings":1608,"jobs":5080},"Engineering & Architecture":{"salary":85081,"take":5763,"savings":2468,"jobs":4950},"Arts, Design & Media":{"salary":44589,"take":3020,"savings":-275,"jobs":2480},"Community & Social Service":{"salary":43447,"take":2943,"savings":-352,"jobs":2260},"Science":{"salary":69284,"take":4693,"savings":1398,"jobs":2160},"Sales":{"salary":65233,"take":4418,"savings":1123,"jobs":1370},"Management":{"salary":97820,"take":6626,"savings":3331,"jobs":800},"Other":{"salary":63130,"take":4276,"savings":981,"jobs":80}},"New York":{"Business & Finance":{"salary":83265,"take":5153,"savings":1,"jobs":582770},"Education":{"salary":70726,"take":4377,"savings":-775,"jobs":322320},"Computer & Math":{"salary":111288,"take":6887,"savings":1735,"jobs":255310},"Healthcare":{"salary":100206,"take":6201,"savings":1049,"jobs":221150},"Arts, Design & Media":{"salary":64192,"take":3972,"savings":-1180,"jobs":91530},"Sales":{"salary":100653,"take":6229,"savings":1077,"jobs":70690},"Engineering & Architecture":{"salary":92364,"take":5716,"savings":564,"jobs":64820},"Community & Social Service":{"salary":58571,"take":3625,"savings":-1527,"jobs":52800},"Science":{"salary":71843,"take":4446,"savings":-706,"jobs":32970},"Management":{"salary":118630,"take":7341,"savings":2189,"jobs":12120},"Office & Admin":{"salary":51410,"take":3181,"savings":-1971,"jobs":970},"Other":{"salary":61397,"take":3799,"savings":-1353,"jobs":260}},"Orlando":{"Business & Finance":{"salary":59477,"take":4090,"savings":-73,"jobs":73540},"Education":{"salary":51546,"take":3545,"savings":-618,"jobs":34810},"Healthcare":{"salary":74868,"take":5148,"savings":985,"jobs":33610},"Computer & Math":{"salary":84955,"take":5842,"savings":1679,"jobs":31210},"Engineering & Architecture":{"salary":83597,"take":5749,"savings":1586,"jobs":14750},"Arts, Design & Media":{"salary":48313,"take":3322,"savings":-841,"jobs":12230},"Sales":{"salary":56363,"take":3876,"savings":-287,"jobs":6810},"Management":{"salary":88350,"take":6076,"savings":1913,"jobs":4340},"Community & Social Service":{"salary":46295,"take":3184,"savings":-979,"jobs":3760},"Science":{"salary":55012,"take":3783,"savings":-380,"jobs":3030}},"Philadelphia":{"Business & Finance":{"salary":69338,"take":4661,"savings":953,"jobs":160150},"Education":{"salary":57199,"take":3845,"savings":137,"jobs":95470},"Healthcare":{"salary":85652,"take":5758,"savings":2050,"jobs":84210},"Computer & Math":{"salary":91931,"take":6180,"savings":2472,"jobs":65600},"Engineering & Architecture":{"salary":86550,"take":5818,"savings":2110,"jobs":31040},"Arts, Design & Media":{"salary":49477,"take":3326,"savings":-382,"jobs":17130},"Science":{"salary":66443,"take":4467,"savings":759,"jobs":15040},"Sales":{"salary":62869,"take":4226,"savings":518,"jobs":13990},"Community & Social Service":{"salary":50770,"take":3413,"savings":-295,"jobs":13920},"Management":{"salary":100680,"take":6768,"savings":3060,"jobs":3390},"Other":{"salary":55162,"take":3708,"savings":0,"jobs":220},"Office & Admin":{"salary":45098,"take":3032,"savings":-676,"jobs":190}},"Phoenix":{"Business & Finance":{"salary":64152,"take":4335,"savings":458,"jobs":124330},"Healthcare":{"salary":78401,"take":5297,"savings":1420,"jobs":60640},"Computer & Math":{"salary":91412,"take":6176,"savings":2299,"jobs":57390},"Education":{"salary":48962,"take":3308,"savings":-569,"jobs":52700},"Engineering & Architecture":{"salary":87589,"take":5918,"savings":2041,"jobs":29020},"Sales":{"salary":60744,"take":4104,"savings":227,"jobs":20220},"Arts, Design & Media":{"salary":49941,"take":3374,"savings":-503,"jobs":14870},"Community & Social Service":{"salary":48659,"take":3288,"savings":-589,"jobs":9880},"Management":{"salary":99900,"take":6750,"savings":2873,"jobs":8170},"Science":{"salary":66126,"take":4468,"savings":591,"jobs":7930},"Office & Admin":{"salary":56900,"take":3845,"savings":-32,"jobs":70},"Other":{"salary":45700,"take":3088,"savings":-789,"jobs":70}},"Pittsburgh":{"Business & Finance":{"salary":62000,"take":4203,"savings":1080,"jobs":53670},"Healthcare":{"salary":74952,"take":5081,"savings":1958,"jobs":33140},"Education":{"salary":57213,"take":3879,"savings":756,"jobs":29670},"Computer & Math":{"salary":82547,"take":5596,"savings":2473,"jobs":25380},"Engineering & Architecture":{"salary":80236,"take":5439,"savings":2316,"jobs":15520},"Arts, Design & Media":{"salary":41350,"take":2803,"savings":-320,"jobs":6120},"Community & Social Service":{"salary":46965,"take":3184,"savings":61,"jobs":5320},"Sales":{"salary":58525,"take":3968,"savings":845,"jobs":4470},"Science":{"salary":63295,"take":4291,"savings":1168,"jobs":4190},"Management":{"salary":93910,"take":6366,"savings":3243,"jobs":1420},"Office & Admin":{"salary":41920,"take":2842,"savings":-281,"jobs":80}},"Portland":{"Business & Finance":{"salary":71259,"take":4435,"savings":255,"jobs":72650},"Computer & Math":{"salary":107151,"take":6669,"savings":2489,"jobs":36220},"Education":{"salary":62246,"take":3874,"savings":-306,"jobs":29120},"Healthcare":{"salary":104746,"take":6520,"savings":2340,"jobs":26380},"Engineering & Architecture":{"salary":94603,"take":5888,"savings":1708,"jobs":21270},"Arts, Design & Media":{"salary":53869,"take":3353,"savings":-827,"jobs":13280},"Community & Social Service":{"salary":57075,"take":3552,"savings":-628,"jobs":10630},"Science":{"salary":74533,"take":4639,"savings":459,"jobs":6300},"Sales":{"salary":72883,"take":4536,"savings":356,"jobs":4950},"Management":{"salary":109290,"take":6802,"savings":2622,"jobs":2690},"Other":{"salary":55620,"take":3462,"savings":-718,"jobs":60}},"Raleigh":{"Business & Finance":{"salary":65413,"take":4247,"savings":177,"jobs":53210},"Computer & Math":{"salary":90354,"take":5866,"savings":1796,"jobs":31030},"Education":{"salary":47648,"take":3094,"savings":-976,"jobs":17150},"Healthcare":{"salary":74305,"take":4824,"savings":754,"jobs":15020},"Engineering & Architecture":{"salary":82311,"take":5344,"savings":1274,"jobs":13480},"Arts, Design & Media":{"salary":48589,"take":3155,"savings":-915,"jobs":6900},"Sales":{"salary":64781,"take":4206,"savings":136,"jobs":6660},"Science":{"salary":68494,"take":4447,"savings":377,"jobs":5720},"Community & Social Service":{"salary":49814,"take":3234,"savings":-836,"jobs":3260},"Management":{"salary":96420,"take":6260,"savings":2190,"jobs":3020},"Other":{"salary":44990,"take":2921,"savings":-1149,"jobs":30}},"Richmond":{"Business & Finance":{"salary":66343,"take":4306,"savings":386,"jobs":47010},"Education":{"salary":50404,"take":3272,"savings":-648,"jobs":21490},"Computer & Math":{"salary":92670,"take":6015,"savings":2095,"jobs":17660},"Healthcare":{"salary":79263,"take":5145,"savings":1225,"jobs":16120},"Engineering & Architecture":{"salary":86374,"take":5606,"savings":1686,"jobs":6430},"Arts, Design & Media":{"salary":54473,"take":3536,"savings":-384,"jobs":4850},"Sales":{"salary":59389,"take":3855,"savings":-65,"jobs":4000},"Community & Social Service":{"salary":56019,"take":3636,"savings":-284,"jobs":3840},"Science":{"salary":64280,"take":4172,"savings":252,"jobs":3390},"Management":{"salary":94560,"take":6138,"savings":2218,"jobs":1270}},"Sacramento":{"Business & Finance":{"salary":70116,"take":4559,"savings":236,"jobs":57920},"Education":{"salary":69516,"take":4520,"savings":197,"jobs":38560},"Healthcare":{"salary":125403,"take":8153,"savings":3830,"jobs":26300},"Computer & Math":{"salary":100551,"take":6537,"savings":2214,"jobs":20580},"Engineering & Architecture":{"salary":101299,"take":6586,"savings":2263,"jobs":15150},"Community & Social Service":{"salary":54373,"take":3535,"savings":-788,"jobs":8870},"Science":{"salary":79741,"take":5184,"savings":861,"jobs":8590},"Arts, Design & Media":{"salary":58917,"take":3831,"savings":-492,"jobs":7210},"Sales":{"salary":67586,"take":4394,"savings":71,"jobs":3430},"Management":{"salary":103270,"take":6714,"savings":2391,"jobs":2760},"Other":{"salary":45202,"take":2939,"savings":-1384,"jobs":360}},"Salt Lake City":{"Business & Finance":{"salary":61485,"take":4063,"savings":432,"jobs":55990},"Computer & Math":{"salary":91056,"take":6017,"savings":2386,"jobs":32610},"Healthcare":{"salary":69644,"take":4602,"savings":971,"jobs":19620},"Education":{"salary":54482,"take":3600,"savings":-31,"jobs":18100},"Engineering & Architecture":{"salary":85053,"take":5620,"savings":1989,"jobs":12390},"Sales":{"salary":63048,"take":4166,"savings":535,"jobs":6400},"Arts, Design & Media":{"salary":49695,"take":3284,"savings":-347,"jobs":6220},"Science":{"salary":69062,"take":4563,"savings":932,"jobs":3990},"Community & Social Service":{"salary":51817,"take":3424,"savings":-207,"jobs":2130},"Other":{"salary":41290,"take":2728,"savings":-903,"jobs":100}},"San Antonio":{"Business & Finance":{"salary":61527,"take":4325,"savings":1013,"jobs":63120},"Education":{"salary":58060,"take":4081,"savings":769,"jobs":38220},"Healthcare":{"salary":74311,"take":5223,"savings":1911,"jobs":27170},"Computer & Math":{"salary":85688,"take":6023,"savings":2711,"jobs":23940},"Engineering & Architecture":{"salary":82447,"take":5795,"savings":2483,"jobs":10030},"Arts, Design & Media":{"salary":42652,"take":2998,"savings":-314,"jobs":5400},"Sales":{"salary":61224,"take":4304,"savings":992,"jobs":5100},"Management":{"salary":76480,"take":5376,"savings":2064,"jobs":4680},"Community & Social Service":{"salary":49644,"take":3490,"savings":178,"jobs":4500},"Science":{"salary":66913,"take":4703,"savings":1391,"jobs":3630}},"San Diego":{"Business & Finance":{"salary":73743,"take":4656,"savings":-241,"jobs":81580},"Computer & Math":{"salary":106428,"take":6720,"savings":1823,"jobs":46790},"Education":{"salary":64570,"take":4077,"savings":-820,"jobs":43410},"Healthcare":{"salary":120448,"take":7605,"savings":2708,"jobs":32250},"Engineering & Architecture":{"salary":103744,"take":6551,"savings":1654,"jobs":30370},"Arts, Design & Media":{"salary":54952,"take":3470,"savings":-1427,"jobs":11090},"Science":{"salary":73819,"take":4661,"savings":-236,"jobs":10730},"Community & Social Service":{"salary":53634,"take":3387,"savings":-1510,"jobs":8520},"Sales":{"salary":65250,"take":4120,"savings":-777,"jobs":7590},"Management":{"salary":102510,"take":6473,"savings":1576,"jobs":3800},"Other":{"salary":49730,"take":3140,"savings":-1757,"jobs":110}},"San Francisco":{"Business & Finance":{"salary":85733,"take":5343,"savings":171,"jobs":164350},"Computer & Math":{"salary":136383,"take":8499,"savings":3327,"jobs":131620},"Education":{"salary":66972,"take":4173,"savings":-999,"jobs":60270},"Healthcare":{"salary":128313,"take":7996,"savings":2824,"jobs":48460},"Engineering & Architecture":{"salary":114055,"take":7108,"savings":1936,"jobs":42190},"Arts, Design & Media":{"salary":68860,"take":4291,"savings":-881,"jobs":26200},"Science":{"salary":91128,"take":5679,"savings":507,"jobs":17520},"Sales":{"salary":83868,"take":5226,"savings":54,"jobs":15300},"Community & Social Service":{"salary":62278,"take":3881,"savings":-1291,"jobs":13210},"Management":{"salary":127040,"take":7917,"savings":2745,"jobs":5160},"Office & Admin":{"salary":44340,"take":2763,"savings":-2409,"jobs":70},"Other":{"salary":58340,"take":3636,"savings":-1536,"jobs":40}},"San Jose":{"Computer & Math":{"salary":159290,"take":9768,"savings":4165,"jobs":134420},"Business & Finance":{"salary":93138,"take":5712,"savings":109,"jobs":77650},"Engineering & Architecture":{"salary":140404,"take":8610,"savings":3007,"jobs":40270},"Education":{"salary":75364,"take":4622,"savings":-981,"jobs":26770},"Healthcare":{"salary":157064,"take":9632,"savings":4029,"jobs":25510},"Arts, Design & Media":{"salary":73228,"take":4491,"savings":-1112,"jobs":8350},"Sales":{"salary":98716,"take":6054,"savings":451,"jobs":7640},"Community & Social Service":{"salary":65416,"take":4012,"savings":-1591,"jobs":4940},"Science":{"salary":91415,"take":5606,"savings":3,"jobs":4940},"Management":{"salary":124940,"take":7662,"savings":2059,"jobs":1850}},"Seattle":{"Business & Finance":{"salary":81838,"take":5493,"savings":591,"jobs":166900},"Computer & Math":{"salary":116278,"take":7804,"savings":2902,"jobs":162460},"Healthcare":{"salary":99521,"take":6680,"savings":1778,"jobs":45670},"Education":{"salary":75535,"take":5070,"savings":168,"jobs":44240},"Engineering & Architecture":{"salary":106916,"take":7176,"savings":2274,"jobs":40230},"Arts, Design & Media":{"salary":61902,"take":4155,"savings":-747,"jobs":17960},"Sales":{"salary":75402,"take":5061,"savings":159,"jobs":13830},"Science":{"salary":78566,"take":5273,"savings":371,"jobs":13490},"Community & Social Service":{"salary":61242,"take":4110,"savings":-792,"jobs":11490},"Management":{"salary":133100,"take":8933,"savings":4031,"jobs":4010},"Office & Admin":{"salary":48130,"take":3230,"savings":-1672,"jobs":170},"Other":{"salary":48500,"take":3255,"savings":-1647,"jobs":80}},"St. Louis":{"Business & Finance":{"salary":63312,"take":4277,"savings":1097,"jobs":72370},"Education":{"salary":47365,"take":3200,"savings":20,"jobs":41650},"Healthcare":{"salary":74118,"take":5007,"savings":1827,"jobs":40140},"Computer & Math":{"salary":84486,"take":5708,"savings":2528,"jobs":31410},"Engineering & Architecture":{"salary":80726,"take":5454,"savings":2274,"jobs":13510},"Arts, Design & Media":{"salary":44289,"take":2992,"savings":-188,"jobs":8400},"Sales":{"salary":63519,"take":4291,"savings":1111,"jobs":7740},"Community & Social Service":{"salary":48228,"take":3258,"savings":78,"jobs":5520},"Science":{"salary":65489,"take":4424,"savings":1244,"jobs":4670},"Management":{"salary":92670,"take":6261,"savings":3081,"jobs":2880},"Office & Admin":{"salary":51572,"take":3484,"savings":304,"jobs":130},"Other":{"salary":49150,"take":3320,"savings":140,"jobs":50}},"Tampa":{"Business & Finance":{"salary":60483,"take":4188,"savings":221,"jobs":86730},"Healthcare":{"salary":74859,"take":5184,"savings":1217,"jobs":44540},"Computer & Math":{"salary":86666,"take":6002,"savings":2035,"jobs":36420},"Education":{"salary":48419,"take":3353,"savings":-614,"jobs":32090},"Engineering & Architecture":{"salary":76736,"take":5314,"savings":1347,"jobs":13840},"Arts, Design & Media":{"salary":43781,"take":3032,"savings":-935,"jobs":11180},"Sales":{"salary":54296,"take":3760,"savings":-207,"jobs":10180},"Community & Social Service":{"salary":47999,"take":3324,"savings":-643,"jobs":5030},"Management":{"salary":84330,"take":5840,"savings":1873,"jobs":4760},"Science":{"salary":53476,"take":3703,"savings":-264,"jobs":4750},"Other":{"salary":33385,"take":2312,"savings":-1655,"jobs":120},"Office & Admin":{"salary":35060,"take":2428,"savings":-1539,"jobs":30}},"Washington":{"Business & Finance":{"salary":80061,"take":5088,"savings":477,"jobs":282950},"Computer & Math":{"salary":110901,"take":7048,"savings":2437,"jobs":136070},"Education":{"salary":60708,"take":3858,"savings":-753,"jobs":107490},"Healthcare":{"salary":80375,"take":5108,"savings":497,"jobs":54760},"Engineering & Architecture":{"salary":99243,"take":6307,"savings":1696,"jobs":46450},"Arts, Design & Media":{"salary":70109,"take":4455,"savings":-156,"jobs":41830},"Science":{"salary":93297,"take":5929,"savings":1318,"jobs":31000},"Sales":{"salary":70063,"take":4453,"savings":-158,"jobs":13150},"Community & Social Service":{"salary":61455,"take":3905,"savings":-706,"jobs":12990},"Management":{"salary":104010,"take":6610,"savings":1999,"jobs":6630},"Office & Admin":{"salary":48726,"take":3097,"savings":-1514,"jobs":210},"Other":{"salary":65509,"take":4163,"savings":-448,"jobs":70}}},"fields":["Arts, Design & Media","Business & Finance","Community & Social Service","Computer & Math","Education","Engineering & Architecture","Healthcare","Management","Office & Admin","Sales","Science","Other"]};</script>
+<script>
+(function(){
+  const CITIES = DATA.cities, BYFIELD = DATA.byField, FIELDS = DATA.fields;
+  const REGIONS = ["All regions","Northeast","Midwest","South","West"];
+  const ALL = "All fields";
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const state = { field: ALL, region: "All regions", goal: 10000, pinned: null };
+
+  const f$ = d3.format("$,.0f");
+  const fK = v => "$" + d3.format(",.1f")(v/1000) + "K";
+  const fMo = m => !isFinite(m) ? "never"
+    : m <= 60 ? d3.format(".1f")(m) + " mo"
+    : m < 240 ? d3.format(".1f")(m/12) + " yrs"
+    : d3.format(",.0f")(m/12) + " yrs";
+  const fPct = d3.format(".0%");
+
+  // ---------- controls ----------
+  const fieldSel = d3.select("#field");
+  fieldSel.selectAll("option").data([ALL].concat(FIELDS)).join("option").attr("value", d=>d).text(d=>d);
+  fieldSel.on("change", function(){ state.field = this.value; state.pinned = null; update(true); });
+
+  const regionBox = d3.select("#region");
+  regionBox.selectAll("button").data(REGIONS).join("button")
+    .attr("type","button").attr("aria-pressed", d => d===state.region)
+    .text(d=>d)
+    .on("click", (e,d)=>{ state.region = d; regionBox.selectAll("button").attr("aria-pressed", x => x===d); update(true); });
+
+  const goalIn = document.getElementById("goal"), goalOut = document.getElementById("goalOut");
+  goalIn.addEventListener("input", ()=>{ state.goal = +goalIn.value; goalOut.textContent = f$(state.goal); update(false); });
+
+  const tableBtn = document.getElementById("tableToggle"), table = document.getElementById("table");
+  tableBtn.addEventListener("click", ()=>{
+    const on = tableBtn.getAttribute("aria-pressed") !== "true";
+    tableBtn.setAttribute("aria-pressed", on); table.hidden = !on; chartEl.style.display = on ? "none" : "";
+  });
+
+  // ---------- data ----------
+  function rows(){
+    const out = [];
+    for (const c of CITIES){
+      let f;
+      if (state.field === ALL) f = { salary:c.salary, take:c.take, savings:c.savings, jobs:c.jobs };
+      else f = (BYFIELD[c.city] || {})[state.field];
+      if (!f) continue;
+      if (state.region !== "All regions" && c.region !== state.region) continue;
+      const months = f.savings > 0 ? state.goal / f.savings : Infinity;
+      out.push(Object.assign({}, c, f, { months }));
+    }
+    out.sort((a,b)=> (isFinite(a.months)&&isFinite(b.months)) ? a.months-b.months
+                   : isFinite(a.months) ? -1 : isFinite(b.months) ? 1 : b.savings-a.savings);
+    return out;
+  }
+
+  // ---------- chart ----------
+  const chartEl = document.getElementById("chart");
+  const svg = d3.select(chartEl).append("svg");
+  const gGrid = svg.append("g").attr("class","grid");
+  const gLanes = svg.append("g").attr("class","lanes");
+  const gDiv = svg.append("g").attr("class","divider");
+  const tip = document.getElementById("tip");
+  const M = { top: 26, right: 118, bottom: 6, left: 148 }, LANE = 22, DIV = 34;
+
+  function update(race){
+    const data = rows();
+    const width = Math.max(560, chartEl.clientWidth || 800);
+    const innerW = width - M.left - M.right;
+    const finite = data.filter(d=>isFinite(d.months)), never = data.filter(d=>!isFinite(d.months));
+    const maxF = d3.max(finite, d=>d.months) || 0;
+    const cap = finite.length ? Math.min(60, Math.max(6, Math.ceil(maxF/6)*6)) : 12;
+    const x = d3.scaleLinear().domain([0, cap]).range([0, innerW]);
+    const step = cap <= 12 ? 3 : cap <= 24 ? 6 : 12;
+    const ticks = d3.range(0, cap + 0.1, step);
+
+    const height = M.top + data.length*LANE + (never.length && finite.length ? DIV : 0) + M.bottom;
+    svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height);
+
+    // y positions
+    const yOf = {}; let y = M.top;
+    finite.forEach(d=>{ yOf[d.city] = y; y += LANE; });
+    const divY = y; if (never.length && finite.length) y += DIV;
+    never.forEach(d=>{ yOf[d.city] = y; y += LANE; });
+
+    // grid
+    const g = gGrid.selectAll("g.t").data(ticks, d=>d);
+    const gE = g.enter().append("g").attr("class","t");
+    gE.append("line"); gE.append("text").attr("text-anchor","middle").attr("y", M.top - 10);
+    g.exit().remove();
+    gGrid.selectAll("g.t").attr("transform", d=>`translate(${M.left + x(d)},0)`)
+      .select("line").attr("class", d=> d===0 ? "zero" : null).attr("y1", M.top - 4).attr("y2", height - M.bottom);
+    gGrid.selectAll("g.t").select("text").text(d => d===0 ? "start" : d%12===0 ? (d/12)+(d===12?" yr":" yrs") : d+" mo");
+
+    // divider between finite and never groups
+    const dv = gDiv.selectAll("g").data(never.length && finite.length ? [1] : []);
+    const dvE = dv.enter().append("g");
+    dvE.append("line"); dvE.append("text").attr("x", M.left).attr("dy", "0.32em");
+    dv.exit().remove();
+    gDiv.selectAll("g").attr("transform", `translate(0,${divY + DIV/2})`)
+      .select("line").attr("x1", M.left).attr("x2", M.left + innerW).attr("y1", -DIV/2 + 4).attr("y2", -DIV/2 + 4);
+    gDiv.selectAll("g").select("text").text(`Budget exceeds take-home at this salary: the goal is never reached (${never.length} metro${never.length===1?"":"s"})`);
+
+    // lanes
+    const dur = reduceMotion ? 0 : 500;
+    const lanes = gLanes.selectAll("g.lane").data(data, d=>d.city);
+    const enter = lanes.enter().append("g").attr("class","lane").attr("tabindex", 0)
+      .attr("transform", d=>`translate(0,${yOf[d.city]})`).style("opacity", 0);
+    enter.append("rect").attr("class","hit").attr("x", 0).attr("y", 0).attr("height", LANE).attr("rx", 4);
+    enter.append("text").attr("class","name").attr("x", M.left - 10).attr("y", LANE/2).attr("dy","0.34em").attr("text-anchor","end");
+    enter.append("line").attr("class","stem").attr("y1", LANE/2).attr("y2", LANE/2).attr("x1", M.left).attr("x2", M.left);
+    enter.append("circle").attr("class","dot").attr("r", 5).attr("cy", LANE/2).attr("cx", M.left);
+    enter.append("text").attr("class","val").attr("y", LANE/2).attr("dy","0.34em");
+    enter.on("pointerenter", function(e,d){ d3.select(this).classed("hover", true); showTip(e,d); })
+      .on("pointermove", (e,d)=> showTip(e,d))
+      .on("pointerleave", function(){ d3.select(this).classed("hover", false); hideTip(); })
+      .on("focus", function(e,d){ const b = this.getBoundingClientRect(); showTip({clientX:b.left + M.left + 40, clientY:b.top}, d); })
+      .on("blur", hideTip)
+      .on("click", (e,d)=> pin(d.city))
+      .on("keydown", (e,d)=>{ if (e.key==="Enter" || e.key===" ") { e.preventDefault(); pin(d.city); } });
+    lanes.exit().transition().duration(dur).style("opacity", 0).remove();
+
+    const all = enter.merge(lanes)
+      .classed("never", d=>!isFinite(d.months))
+      .classed("pinned", d=>d.city===state.pinned)
+      .attr("aria-label", d=>`${d.city}, ${d.state}: ${fMo(d.months)}`);
+    all.transition().duration(dur).style("opacity", 1).attr("transform", d=>`translate(0,${yOf[d.city]})`);
+    all.select(".hit").attr("width", width);
+    all.select(".name").each(function(d){
+      const t = d3.select(this); t.text(null);
+      t.append("tspan").text(d.city);
+      t.append("tspan").attr("class","st").text(" " + d.state);
+    });
+
+    // marks: race from the start line, or glide from where they are
+    const endX = d => M.left + (isFinite(d.months) ? x(Math.min(d.months, cap)) : innerW);
+    const msPerMonth = reduceMotion ? 0 : 1500 / cap;
+    const raceDur = d => isFinite(d.months) ? Math.min(d.months, cap) * msPerMonth : 1500;
+    if (race){
+      all.select(".stem").attr("x2", d=>isFinite(d.months) ? M.left : M.left + innerW);
+      all.select(".dot").attr("cx", M.left).style("opacity", d=>isFinite(d.months) ? 1 : 0);
+      all.select(".val").style("opacity", 0);
+    }
+    all.select(".stem").transition("x").duration(d=> race ? raceDur(d) : (reduceMotion ? 0 : 250)).ease(race ? d3.easeLinear : d3.easeCubicOut)
+      .attr("x2", d=>isFinite(d.months) ? endX(d) : M.left + innerW);
+    all.select(".dot").transition("x").duration(d=> race ? raceDur(d) : (reduceMotion ? 0 : 250)).ease(race ? d3.easeLinear : d3.easeCubicOut)
+      .attr("cx", endX).style("opacity", 1);
+    const val = all.select(".val")
+      .text(d=> isFinite(d.months) ? (d.months > cap ? fMo(d.months) + " ›" : fMo(d.months)) : `never · −${f$(-d.savings)}/mo`);
+    if (race){
+      val.interrupt("x").style("opacity", 0).attr("x", d=>endX(d) + 10)
+        .transition("x").delay(d=>raceDur(d)).duration(reduceMotion ? 0 : 200).style("opacity", 1);
+    } else {
+      val.interrupt("x").style("opacity", 1)
+        .transition("x").duration(reduceMotion ? 0 : 250).ease(d3.easeCubicOut).attr("x", d=>endX(d) + 10);
+    }
+
+    // empty state
+    d3.select(chartEl).selectAll(".empty").data(data.length ? [] : [1]).join("div").attr("class","empty")
+      .text("No metros in this region report this field.");
+
+    // note, insight, table, detail
+    const missing = CITIES.filter(c => (state.region==="All regions" || c.region===state.region) && state.field!==ALL && !(BYFIELD[c.city]||{})[state.field]).length;
+    document.getElementById("note").textContent =
+      `${data.length} metro${data.length===1?"":"s"} · goal ${f$(state.goal)}` + (missing ? ` · ${missing} without ${state.field} data` : "");
+    renderInsight(data, finite, never);
+    renderTable(data);
+    renderDetail(data);
+  }
+
+  // ---------- insight line ----------
+  function renderInsight(data, finite, never){
+    const el = document.getElementById("insight"); el.textContent = "";
+    if (!finite.length){ el.textContent = "On a typical entry salary in this field, no metro shown here clears the monthly budget."; return; }
+    const fast = finite[0], slow = finite[finite.length-1];
+    const field = state.field===ALL ? "entry-level salary" : `entry-level ${state.field} salary`;
+    const parts = [];
+    parts.push(["On a typical ", false], [field, false], [", ", false], [`${fast.city} (${fK(fast.salary)})`, true],
+      [` gets to ${f$(state.goal)} in ${fMo(fast.months)}`, false]);
+    if (finite.length > 1) parts.push([`; `, false], [`${slow.city} (${fK(slow.salary)})`, true], [` takes ${fMo(slow.months)}`, false]);
+    parts.push([". ", false]);
+    if (never.length) parts.push([`${never.length} metro${never.length===1?"":"s"} never get there because the budget exceeds take-home.`, false], [" ", false]);
+    const ny = data.find(d=>d.city==="New York"), det = data.find(d=>d.city==="Detroit");
+    if (ny && det && ny.salary > det.salary){
+      const diff = fK(ny.salary - det.salary);
+      let tail;
+      if (isFinite(ny.months) && isFinite(det.months)) tail = `, yet takes ${d3.format(".1f")(ny.months/det.months)}× longer to reach the goal.`;
+      else if (isFinite(det.months)) tail = `, yet never reaches the goal while Detroit does in ${fMo(det.months)}.`;
+      else tail = ".";
+      parts.push(["New York pays about ", false], [diff + " more", true], [" than Detroit", false], [tail, false]);
+    }
+    for (const [t, strong] of parts){
+      if (strong){ const s = document.createElement("strong"); s.textContent = t; el.appendChild(s); }
+      else el.appendChild(document.createTextNode(t));
+    }
+  }
+
+  // ---------- tooltip ----------
+  function showTip(e, d){
+    tip.textContent = "";
+    const add = (cls, text) => { const div = document.createElement("div"); div.className = cls; div.textContent = text; tip.appendChild(div); return div; };
+    add("t", `${d.city}, ${d.state}`);
+    add("m", `${d.region} · ${state.field===ALL ? "all fields" : state.field}`);
+    add("big", isFinite(d.months) ? `${fMo(d.months)} to ${f$(state.goal)}` : `never reaches ${f$(state.goal)}`);
+    const row = (v, l) => { const r = document.createElement("div"); r.className = "row";
+      const a = document.createElement("strong"); a.textContent = v; const b = document.createElement("span"); b.textContent = l;
+      r.appendChild(a); r.appendChild(b); tip.appendChild(r); };
+    row(f$(d.salary), "entry salary (25th pct)");
+    row(f$(d.take) + "/mo", "est. take-home");
+    row("−" + f$(d.expenses) + "/mo", "budget excl. taxes");
+    row((d.savings<0?"−":"") + f$(Math.abs(d.savings)) + "/mo", d.savings<0 ? "shortfall" : "left to save");
+    row(fPct(d.rentShare), "rent share of take-home");
+    tip.style.opacity = 1;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = e.clientX + 14, top = e.clientY + 14;
+    if (left + w > window.innerWidth - 8) left = e.clientX - w - 14;
+    if (top + h > window.innerHeight - 8) top = e.clientY - h - 14;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+  }
+  function hideTip(){ tip.style.opacity = 0; }
+
+  // ---------- pin + detail ----------
+  function pin(city){
+    state.pinned = state.pinned === city ? null : city;
+    gLanes.selectAll("g.lane").classed("pinned", d=>d.city===state.pinned);
+    d3.selectAll("#table tr").classed("pinned", function(){ return this.dataset.city === state.pinned; });
+    renderDetail(rows());
+  }
+  function renderDetail(data){
+    const el = document.getElementById("detail"); el.textContent = "";
+    const d = data.find(r=>r.city===state.pinned);
+    const head = document.createElement("div"); head.className = "head";
+    const left = document.createElement("div");
+    const h3 = document.createElement("h3"); const meta = document.createElement("p"); meta.className = "meta";
+    left.appendChild(h3); left.appendChild(meta); head.appendChild(left); el.appendChild(head);
+    if (!d){
+      el.classList.add("idle");
+      h3.textContent = state.pinned ? `${state.pinned} is not in the current view` : "Click a metro to pin its breakdown";
+      meta.textContent = "Hover any lane for the numbers; click to keep them here.";
+      return;
+    }
+    el.classList.remove("idle");
+    h3.textContent = `${d.city}, ${d.state}`;
+    meta.textContent = `${d.region} · ${state.field===ALL ? "all entry-level fields" : state.field} · goal ${f$(state.goal)}`;
+    const clear = document.createElement("button"); clear.className = "ghost"; clear.type = "button"; clear.textContent = "Clear";
+    clear.addEventListener("click", ()=> pin(d.city)); head.appendChild(clear);
+    const stats = document.createElement("div"); stats.className = "stats";
+    const stat = (v, l) => { const s = document.createElement("div"); s.className = "stat"; const b = document.createElement("b"); b.textContent = v;
+      const sp = document.createElement("span"); sp.textContent = l; s.appendChild(b); s.appendChild(sp); stats.appendChild(s); };
+    stat(isFinite(d.months) ? fMo(d.months) : "never", `to save ${f$(state.goal)}`);
+    stat(f$(d.salary), "entry salary, 25th pct");
+    stat(f$(d.take) + "/mo", "est. take-home");
+    stat(f$(d.expenses) + "/mo", "budget excl. taxes");
+    stat((d.savings<0?"−":"") + f$(Math.abs(d.savings)) + "/mo", d.savings<0 ? "monthly shortfall" : "left to save");
+    stat(fPct(d.rentShare), "rent share of take-home");
+    stat(d3.format(",")(d.jobs), state.field===ALL ? "entry-level jobs" : `entry-level ${state.field} jobs`);
+    stat(d.unemp.toFixed(1) + "%", "unemployment, 2025");
+    stat(fPct(d.young), "residents aged 20–29");
+    el.appendChild(stats);
+    const b = document.createElement("p"); b.className = "budget";
+    b.textContent = "Monthly budget: ";
+    [["housing (studio)", d.housing], ["food", d.food], ["transportation", d.transport], ["healthcare", d.health], ["other necessities", d.other]]
+      .forEach(([l, v], i)=>{ if (i) b.appendChild(document.createTextNode(" · ")); const s = document.createElement("b"); s.textContent = f$(v); b.appendChild(s); b.appendChild(document.createTextNode(" " + l)); });
+    b.appendChild(document.createTextNode(`. Effective tax rate ${fPct(d.tax)}.`));
+    el.appendChild(b);
+  }
+
+  // ---------- table view ----------
+  function renderTable(data){
+    table.textContent = "";
+    const cap = document.createElement("caption"); cap.textContent = `Months to save ${f$(state.goal)} on a typical entry salary, ${state.field===ALL ? "all fields" : state.field}`; cap.style.textAlign = "left"; cap.style.color = "var(--ink-2)"; cap.style.fontSize = "12px"; cap.style.padding = "4px 8px";
+    table.appendChild(cap);
+    const thead = document.createElement("thead"), tr = document.createElement("tr");
+    ["Metro","Region","Entry salary","Take-home / mo","Budget / mo","Savings / mo","Months to goal"].forEach(h=>{ const th = document.createElement("th"); th.scope = "col"; th.textContent = h; tr.appendChild(th); });
+    thead.appendChild(tr); table.appendChild(thead);
+    const tb = document.createElement("tbody");
+    for (const d of data){
+      const r = document.createElement("tr"); r.dataset.city = d.city; if (d.city===state.pinned) r.className = "pinned";
+      [`${d.city}, ${d.state}`, d.region, f$(d.salary), f$(d.take), f$(d.expenses), (d.savings<0?"−":"") + f$(Math.abs(d.savings)), isFinite(d.months) ? d3.format(".1f")(d.months) : "never"]
+        .forEach(v=>{ const td = document.createElement("td"); td.textContent = v; r.appendChild(td); });
+      r.addEventListener("click", ()=> pin(d.city)); r.style.cursor = "pointer";
+      tb.appendChild(r);
+    }
+    table.appendChild(tb);
+  }
+
+  // ---------- URL presets: ?field=...&region=...&goal=...&pin=... ----------
+  const q = new URLSearchParams(location.search);
+  if (q.get("field") && [ALL].concat(FIELDS).includes(q.get("field"))) state.field = q.get("field");
+  if (q.get("region") && REGIONS.includes(q.get("region"))) state.region = q.get("region");
+  if (q.get("goal") && +q.get("goal") >= 1000 && +q.get("goal") <= 50000) state.goal = Math.round(+q.get("goal")/500)*500;
+  if (q.get("pin") && CITIES.some(c=>c.city===q.get("pin"))) state.pinned = q.get("pin");
+  fieldSel.property("value", state.field);
+  regionBox.selectAll("button").attr("aria-pressed", x => x===state.region);
+  goalIn.value = state.goal; goalOut.textContent = f$(state.goal);
+
+  // ---------- go ----------
+  update(true);
+  let resizeT; new ResizeObserver(()=>{ clearTimeout(resizeT); resizeT = setTimeout(()=>update(false), 80); }).observe(chartEl);
+})();
+</script>
+</body>
+</html>

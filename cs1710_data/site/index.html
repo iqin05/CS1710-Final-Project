@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What You Keep</title>
+<meta name="description" content="CS 1710 data story: where a recent graduate can find work and make financial progress, across 40 U.S. metros.">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="data.js"></script>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <span class="brand">What You Keep</span>
+  <a href="#hook">Two offers</a><a href="#compare">Side by side</a><a href="#jobs">Jobs</a><a href="#message">The message</a><a href="#field">Your field</a><a href="#explore">Explore</a><a href="#time">Your first $10K</a><a href="#offer">Your offer</a><a href="#about">About</a>
+</div></nav>
+
+<!-- ===== HOOK ===== -->
+<section class="story" id="hook"><div class="wrap">
+  <div class="hook-layout">
+    <div class="imagine">
+      <p class="beat">Imagine this</p>
+      <h2>Which one do you choose?</h2>
+      <p class="prose">You're about to graduate, and two job offers just landed in your inbox. Taking either one means relocating to a city you've never lived in:</p>
+      <div id="hookOffers"></div>
+      <p class="prose"><strong>Most grads pick by the bigger number.</strong> But our data says the bigger number is the wrong metric.</p>
+      <p class="prose" style="font-size:13px;color:var(--muted)">Change either offer below, or roll a new pair. The rest of this page follows the two cities you choose.</p>
+    </div>
+    <div>
+      <div class="card"><div id="hookMap" class="map"></div></div>
+      <div class="grid2" style="margin-top:14px" id="offerEditors"></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="ghost primary" id="randomize">Randomize offers</button><button class="ghost" id="resetOffers">Reset to default</button></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ===== RISING INSIGHTS ===== -->
+<section class="story" id="compare"><div class="wrap">
+  <p class="beat">Rising insights</p>
+  <h2>Put the two offers side by side</h2>
+  <p class="lede" id="compareLede"></p>
+  <div class="compare" id="compareCards"></div>
+  <div class="card" style="margin-top:16px"><h3>What each paycheck covers in a month</h3><p class="sub">Estimated take-home at the offered salary against EPI's modest single-adult budget for that metro. Bars are on one shared dollar scale.</p><div id="compareBars"></div></div>
+</div></section>
+
+<section class="story" id="jobs" style="padding-top:36px"><div class="wrap">
+  <h2 style="font-size:24px">Which cities have the most entry-level jobs, for you?</h2>
+  <p class="lede">40 U.S. metros. Jobs in occupations that typically need a bachelor's degree and no experience (BLS, May 2025). Pick an industry; click any city in either chart. Your two offer cities are marked.</p>
+  <div id="proto1"></div>
+</div></section>
+
+<!-- ===== MAIN MESSAGE ===== -->
+<section class="story" id="message"><div class="wrap">
+  <div class="hero">
+    <p class="beat">Main message</p>
+    <h2>Recent graduates should compare cities by how much they can save, not just what they earn.</h2>
+    <p id="heroText"></p>
+    <div class="nums" id="heroNums"></div>
+  </div>
+  <div class="card"><h3>A bigger paycheck does not mean more money left over</h3><p class="sub" id="scatterSub"></p><div id="messageScatter"></div></div>
+  <p class="prose" style="margin-top:14px">Starting salary tracks the <strong>cost</strong> of a modest budget closely, but it barely tracks what is left after that budget. The Midwest is where an entry salary goes furthest, not because pay is higher, but because rent takes about 20% of take-home instead of 32–45%.</p>
+</div></section>
+
+<!-- ===== FIELD ===== -->
+<section class="story" id="field"><div class="wrap">
+  <p class="beat">It depends on your field</p>
+  <h2>Your field matters more than your city</h2>
+  <p class="lede">Each cell is what a graduate in that field could save each month in that metro at the 25th-percentile entry salary. The "All fields" column is the blended number a city ranking would show, and it hides a lot.</p>
+  <div id="heatmap"></div>
+</div></section>
+
+<!-- ===== NEXT STEPS ===== -->
+<section class="story" id="explore"><div class="wrap">
+  <p class="beat">Solution / next steps</p>
+  <h2>Before you accept, put the offer through the tool</h2>
+  <p class="lede">Start with where the jobs are. Pick an industry, choose a region, or drag a box on the map.</p>
+  <div id="proto2"></div>
+</div></section>
+
+<section class="story" id="time" style="padding-top:36px"><div class="wrap">
+  <h2 style="font-size:24px">How long until your first $10,000?</h2>
+  <p class="lede">Months it takes a new grad on a typical entry-level salary to save an emergency fund in each metro, after paying for a modest single-adult budget. Pick a career field, narrow to a region, or change the goal.</p>
+  <div id="timeline" class="tl"></div>
+</div></section>
+
+<section class="story" id="offer" style="padding-top:36px"><div class="wrap">
+  <h2 style="font-size:24px">Now look at the two offers with the full picture</h2>
+  <p class="lede">Edit either offer: the salary, the city, or the field. Each bar splits one month of pay into rent, the rest of the budget, taxes, and what is left to save.</p>
+  <div class="grid2" id="offerEditors2"></div>
+  <div class="bd" id="breakdown" style="margin-top:16px"></div>
+  <p class="prose" id="verdict" style="margin-top:16px;font-size:17px"></p>
+</div></section>
+
+<footer id="about"><div class="wrap">
+  <p><strong>About the data.</strong> One combined dataset for 40 U.S. metro areas (matched on CBSA code). Cost of living from the Economic Policy Institute Family Budget Calculator (single adult, 2026 edition, 2025 dollars). Jobs and wages from BLS OEWS (May 2025), keeping the 132 occupations that typically require a bachelor's degree and no experience. Population, rent and commutes from the Census ACS 2024. Price levels from BEA Regional Price Parities. Unemployment from BLS LAUS (2025). "Entry-level salary" is the employment-weighted 25th-percentile wage across those occupations. Savings = estimated take-home at that salary minus EPI's budget excluding taxes; the budget assumes car ownership everywhere, so transit-heavy metros such as New York are likely understated.</p>
+  <p>CS 1710 · Lorena Alvarez, Anna Feng, Ivy Qin</p>
+</div></footer>
+<div class="tooltip" id="tip" role="tooltip"></div>
+
+<script src="js/common.js"></script>
+<script src="js/hook.js"></script>
+<script src="js/compare.js"></script>
+<script src="js/proto1.js"></script>
+<script src="js/message.js"></script>
+<script src="js/heatmap.js"></script>
+<script src="js/proto2.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/breakdown.js"></script>
+<script>
+  App.loadMap().then(() => {
+    Hook.mount(); Compare.mount(); Proto1.mount(); Message.mount(); Heatmap.mount(); Proto2.mount(); Timeline.mount(); Breakdown.mount();
+    App.emit();
+  });
+</script>
+</body>
+</html>

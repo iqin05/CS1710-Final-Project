@@ -1,0 +1,325 @@
+/* Shared tokens and primitives used across sections. Section-specific styles live in each component. */
+:root {
+	color-scheme: light;
+	--surface: #fcfcfb;
+	--page: #f7f6f2;
+	--ink: #0b0b0b;
+	--ink-2: #52514e;
+	--muted: #898781;
+	--grid: #e1e0d9;
+	--axis: #c3c2b7;
+	--border: rgba(11, 11, 11, 0.1);
+	--series: #3d6fb0;
+	--series-soft: #a9bfdb;
+	--accent: #c4612f;
+	--accent-soft: #e8c4b1;
+	--a: #3d6fb0;
+	--b: #c4612f;
+	--neg: #c0392b;
+	--pos: #3d6fb0;
+	--mid: #f0efec;
+	--control: #fff;
+	--control-active: #2f4f7f;
+	--control-active-ink: #fff;
+	--tip-bg: #fff;
+	--hero-bg: #1d2a3d;
+	--hero-ink: #f4f1ea;
+}
+* {
+	box-sizing: border-box;
+}
+html {
+	scroll-behavior: smooth;
+}
+body {
+	margin: 0;
+	background: var(--page);
+	color: var(--ink);
+	font:
+		15px/1.5 system-ui,
+		-apple-system,
+		'Segoe UI',
+		sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	font-weight: 650;
+	line-height: 1.2;
+}
+a {
+	color: inherit;
+}
+.wrap {
+	max-width: 1120px;
+	margin: 0 auto;
+	padding: 0 20px;
+}
+.beat {
+	font-size: 11px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--accent);
+	font-weight: 700;
+	margin: 0 0 8px;
+}
+section.story {
+	padding: 64px 0 24px;
+	/* Leave room for the sticky nav when jumping to a section. */
+	scroll-margin-top: 46px;
+}
+section.story h2 {
+	font-size: 30px;
+	margin: 0 0 10px;
+	max-width: 24ch;
+}
+section.story .lede {
+	font-size: 17px;
+	color: var(--ink-2);
+	max-width: 70ch;
+	margin: 0 0 22px;
+}
+.prose {
+	max-width: 70ch;
+	color: var(--ink-2);
+}
+.prose strong {
+	color: var(--ink);
+	font-weight: 600;
+}
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 16px 18px;
+	min-width: 0;
+}
+.card h3 {
+	font-size: 15px;
+	margin: 0 0 2px;
+}
+.card .sub {
+	font-size: 12px;
+	color: var(--muted);
+	margin: 0 0 8px;
+}
+.grid2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+.grid-main-side {
+	display: grid;
+	grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+	gap: 16px;
+}
+@media (max-width: 860px) {
+	.grid2,
+	.grid-main-side {
+		grid-template-columns: 1fr;
+	}
+}
+.filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 18px;
+	align-items: center;
+	margin: 0 0 14px;
+}
+.filters label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--ink-2);
+	font-size: 12px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	font-weight: 600;
+}
+.filters .note {
+	font-size: 12px;
+	color: var(--muted);
+}
+select,
+input[type='number'] {
+	font: inherit;
+	font-size: 13px;
+	color: var(--ink);
+	background: var(--control);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+select {
+	padding-right: 26px;
+	min-width: 180px;
+}
+.seg {
+	display: inline-flex;
+	flex-wrap: wrap;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--control);
+}
+.seg button {
+	font: inherit;
+	font-size: 13px;
+	color: var(--ink-2);
+	background: transparent;
+	border: 0;
+	border-right: 1px solid var(--border);
+	padding: 6px 12px;
+	cursor: pointer;
+}
+.seg button:last-child {
+	border-right: 0;
+}
+.seg button[aria-pressed='true'] {
+	background: var(--control-active);
+	color: var(--control-active-ink);
+}
+.ghost {
+	font: inherit;
+	font-size: 13px;
+	color: var(--ink-2);
+	background: var(--control);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 6px 12px;
+	cursor: pointer;
+}
+.ghost[aria-pressed='true'],
+.ghost.primary {
+	background: var(--control-active);
+	color: var(--control-active-ink);
+	border-color: transparent;
+}
+svg {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	overflow: visible;
+}
+svg text {
+	font-family: inherit;
+}
+.axis text {
+	fill: var(--muted);
+	font-size: 11px;
+}
+.axis line,
+.axis path {
+	stroke: var(--grid);
+}
+.axis-label {
+	fill: var(--muted);
+	font-size: 11px;
+}
+/* City profile card under a chart */
+.infocard {
+	margin-top: 14px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-left: 4px solid var(--accent);
+	border-radius: 12px;
+	padding: 14px 18px;
+}
+.infocard.idle {
+	border-left-color: var(--axis);
+	color: var(--muted);
+}
+.infocard h3 {
+	margin: 0;
+	font-size: 17px;
+}
+.infocard .meta {
+	color: var(--ink-2);
+	font-size: 12px;
+	margin: 2px 0 10px;
+}
+.infocard .head {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+}
+.stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	gap: 12px 18px;
+}
+.stat b {
+	display: block;
+	font-size: 17px;
+	font-weight: 650;
+	color: var(--ink);
+}
+.stat span {
+	font-size: 12px;
+	color: var(--ink-2);
+}
+/* Shared horizontal-bar and dot marks (Prototype 1 and 2, main-message scatter) */
+.hbar rect {
+	fill: var(--series-soft);
+	transition: width 300ms;
+}
+.hbar rect.sel {
+	fill: var(--accent);
+}
+.hbar rect.mark {
+	fill: var(--series);
+}
+.hbar text.name {
+	font-size: 11px;
+	fill: var(--ink-2);
+}
+.hbar text.name.sel {
+	fill: var(--accent);
+	font-weight: 650;
+}
+.hbar text.v {
+	font-size: 10px;
+	fill: var(--muted);
+}
+.hbar .row {
+	cursor: pointer;
+}
+.dot {
+	fill: var(--series-soft);
+	fill-opacity: 0.85;
+	stroke: var(--surface);
+	stroke-width: 1.5;
+	cursor: pointer;
+}
+.dot.sel {
+	fill: var(--accent);
+	fill-opacity: 1;
+}
+.dot.mark {
+	fill: var(--series);
+}
+.dotlbl {
+	font-size: 11px;
+	fill: var(--ink-2);
+	pointer-events: none;
+}
+.dotlbl.sel {
+	fill: var(--ink);
+	font-weight: 650;
+}
+.map path.state {
+	fill: #ecebe6;
+	stroke: #fff;
+	stroke-width: 0.8;
+}
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	* {
+		transition: none !important;
+	}
+}

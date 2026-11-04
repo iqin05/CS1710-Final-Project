@@ -67,8 +67,6 @@ a {
 }
 section.story {
 	padding: 64px 0 24px;
-	/* Leave room for the sticky nav when jumping to a section. */
-	scroll-margin-top: 46px;
 }
 section.story h2 {
 	font-size: 30px;

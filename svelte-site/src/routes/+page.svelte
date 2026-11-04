@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { ALL, DEFAULT_OFFERS, loadData, fieldRow, round100 } from '#lib/data.js';
+	import { loadData, offerAt, defaultOffers } from '#lib/data.js';
 	import Tooltip from '#lib/Tooltip.svelte';
 	import Hook from '#lib/Hook.svelte';
 	import Compare from '#lib/Compare.svelte';
@@ -10,25 +10,31 @@
 	import Proto2 from '#lib/Proto2.svelte';
 	import Timeline from '#lib/Timeline.svelte';
 	import Breakdown from '#lib/Breakdown.svelte';
+	import Scrolly from '#lib/Scrolly.svelte';
+
+	// The scroll index: one step per storyboard beat.
+	const BEATS = [
+		{ id: 'hook', label: 'Hook' },
+		{ id: 'rising', label: 'Rising insights' },
+		{ id: 'message', label: 'Main message' },
+		{ id: 'solution', label: 'Solution / next steps' }
+	];
 
 	let data = $state(null);
 	let error = $state(null);
 
 	// The reader's two offers. Every section reads these; the hook and the final section edit them.
-	let offers = $state(structuredClone(DEFAULT_OFFERS));
+	// Set from the data on load, before any section renders.
+	let offers = $state(null);
 
-	// Changing an offer's city or field resets its salary to that city × field's typical entry pay.
+	// Changing an offer's city or field resets its salary to that city × field's entry-level pay.
 	function setOffer(key, patch) {
 		const o = { ...offers[key], ...patch };
-		if ((patch.city || patch.field) && patch.salary == null) {
-			const r = fieldRow(data, o.city, o.field) ?? fieldRow(data, o.city, ALL);
-			o.salary = round100(r.salary);
-		}
-		offers[key] = o;
+		offers[key] = (patch.city || patch.field) && patch.salary == null ? offerAt(data, o.city, o.field) : o;
 	}
 
 	// Two different cities, one field both have (skipping the thin catch-all fields),
-	// each paying near its local 25th-percentile salary (±8%).
+	// each at its local entry-level (25th-percentile) salary.
 	function randomize() {
 		const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 		const a = pick(data.cities).city;
@@ -37,30 +43,17 @@
 		const field = pick(
 			data.fields.filter((f) => f !== 'Other' && f !== 'Office & Admin' && data.byField[a][f] && data.byField[b][f])
 		);
-		const jitter = () => 1 + (Math.random() - 0.5) * 0.16;
-		offers = {
-			A: { city: a, field, salary: round100(fieldRow(data, a, field).salary * jitter()) },
-			B: { city: b, field, salary: round100(fieldRow(data, b, field).salary * jitter()) }
-		};
+		offers = { A: offerAt(data, a, field), B: offerAt(data, b, field) };
 	}
 
-	const reset = () => (offers = structuredClone(DEFAULT_OFFERS));
+	const reset = () => (offers = defaultOffers(data));
 
-	const NAV = [
-		['hook', 'Two offers'],
-		['compare', 'Side by side'],
-		['jobs', 'Jobs'],
-		['message', 'The message'],
-		['field', 'Your field'],
-		['explore', 'Explore'],
-		['time', 'Your first $10K'],
-		['offer', 'Your offer'],
-		['about', 'About']
-	];
 
 	onMount(async () => {
 		try {
-			data = await loadData();
+			const d = await loadData();
+			offers = defaultOffers(d);
+			data = d;
 		} catch (e) {
 			error = e.message;
 		}
@@ -68,33 +61,46 @@
 </script>
 
 <svelte:head>
-	<title>What You Keep</title>
+	<title>Beyond the First Paycheck</title>
 	<meta
 		name="description"
 		content="CS 1710 data story: where a recent graduate can find work and make financial progress, across 40 U.S. metros."
 	/>
 </svelte:head>
 
-<nav class="top">
-	<div class="wrap">
-		<span class="brand">What You Keep</span>
-		{#each NAV as [id, label] (id)}<a href="#{id}">{label}</a>{/each}
-	</div>
-</nav>
+<header class="title-screen">
+	<h1>Beyond the First Paycheck</h1>
+	<a class="cue" href="#hook">
+		<span>Scroll to begin</span>
+		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+			<path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+		</svg>
+	</a>
+</header>
 
 {#if error}
 	<p class="wrap status">Could not load data: {error}</p>
 {:else if !data}
 	<p class="wrap status">Loading…</p>
 {:else}
-	<Hook {data} {offers} {setOffer} onrandomize={randomize} onreset={reset} />
-	<Compare {data} {offers} />
-	<Proto1 {data} {offers} />
-	<Message {data} {offers} />
-	<Heatmap {data} {offers} />
-	<Proto2 {data} {offers} />
-	<Timeline {data} {offers} />
-	<Breakdown {data} {offers} {setOffer} />
+	<Scrolly steps={BEATS}>
+		{#snippet scene(beat)}
+			{#if beat.id === 'hook'}
+				<Hook {data} {offers} {setOffer} onrandomize={randomize} onreset={reset} />
+			{:else if beat.id === 'rising'}
+				<Compare {data} {offers} />
+			{:else if beat.id === 'message'}
+				<Message {data} {offers} />
+			{:else}
+				<!-- The tool, then industry, time to $10K, job opportunities, and the full picture. -->
+				<Proto2 {data} {offers} />
+				<Heatmap {data} {offers} />
+				<Timeline {data} {offers} />
+				<Proto1 {data} {offers} />
+				<Breakdown {data} {offers} {setOffer} />
+			{/if}
+		{/snippet}
+	</Scrolly>
 	<Tooltip />
 {/if}
 
@@ -114,33 +120,57 @@
 </footer>
 
 <style>
-	nav.top {
-		position: sticky;
-		top: 0;
-		z-index: 5;
-		background: rgba(247, 246, 242, 0.92);
-		backdrop-filter: blur(8px);
-		border-bottom: 1px solid var(--border);
-	}
-	nav.top .wrap {
+	.title-screen {
+		min-height: 100vh;
+		min-height: 100svh;
 		display: flex;
-		gap: 4px 18px;
+		flex-direction: column;
 		align-items: center;
-		height: 46px;
-		overflow-x: auto;
-		white-space: nowrap;
+		justify-content: center;
+		padding: 0 16px;
+		text-align: center;
+		position: relative;
 	}
-	.brand {
+	.title-screen h1 {
+		font-size: clamp(40px, 8vw, 96px);
+		line-height: 1.02;
+		letter-spacing: -0.025em;
+		max-width: 12ch;
+		margin: 0;
+	}
+	.cue {
+		position: absolute;
+		bottom: 32px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
 		font-weight: 650;
-		margin-right: auto;
-	}
-	nav a {
-		font-size: 13px;
-		color: var(--ink-2);
+		color: var(--muted);
 		text-decoration: none;
 	}
-	nav a:hover {
+	.cue:hover {
 		color: var(--ink);
+	}
+	.cue svg {
+		animation: nudge 1.8s ease-in-out infinite;
+	}
+	@keyframes nudge {
+		0%,
+		100% {
+			transform: translateY(0);
+		}
+		50% {
+			transform: translateY(5px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.cue svg {
+			animation: none;
+		}
 	}
 	.status {
 		padding-top: 40px;

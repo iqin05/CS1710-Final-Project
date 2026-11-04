@@ -15,7 +15,7 @@ export default defineConfig({
 			// so CI sets BASE_PATH; local dev and preview run at the root.
 			adapter: adapter(),
 			paths: { base: process.env.BASE_PATH ?? '' },
-			// The nav's #section anchors only exist after the data loads in the browser.
+			// Section ids only exist after the data loads in the browser.
 			prerender: { handleMissingId: 'ignore' }
 		})
 	]

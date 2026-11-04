@@ -27,7 +27,8 @@ there is no `data.js` step.
 
 | File | Section |
 | --- | --- |
-| `src/routes/+page.svelte` | Page layout, nav, footer, and the two offers every section shares |
+| `src/routes/+page.svelte` | Title screen, the four storyboard beats, footer, and the two offers every section shares |
+| `src/lib/Scrolly.svelte` | Scroll index (Scrollama): one step per beat (Hook, Rising insights, Main message, Solution), step-indicator controls |
 | `src/lib/Hook.svelte` | Hook: map with the two offer cities, offer letters, randomize/reset |
 | `src/lib/Compare.svelte` | Rising insights: the two offers side by side |
 | `src/lib/Proto1.svelte` | Jobs: top-15 bars, opportunity vs. pay scatter, city card |

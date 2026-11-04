@@ -107,9 +107,15 @@ export function calc(data, city, salary) {
 	};
 }
 
-export const round100 = (v) => Math.round(v / 100) * 100;
+/** Offer salaries move in $5,000 steps; offers start at the nearest step to the data's salary. */
+export const SALARY_STEP = 5000;
+export const roundSalary = (v) => Math.round(v / SALARY_STEP) * SALARY_STEP;
 
-export const DEFAULT_OFFERS = {
-	A: { city: 'New York', field: ALL, salary: 86700 },
-	B: { city: 'Detroit', field: ALL, salary: 73700 }
-};
+/** An offer in `city`/`field` at that metro's entry-level (25th-percentile) salary, rounded. */
+export function offerAt(data, city, field) {
+	const r = fieldRow(data, city, field) ?? fieldRow(data, city, ALL);
+	return { city, field, salary: roundSalary(r.salary) };
+}
+
+/** The opening pair: New York vs. Detroit, any field, at their local entry-level salaries. */
+export const defaultOffers = (data) => ({ A: offerAt(data, 'New York', ALL), B: offerAt(data, 'Detroit', ALL) });

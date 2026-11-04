@@ -1,14 +1,15 @@
 <script>
-	import { ALL } from '#lib/data.js';
+	import { ALL, SALARY_STEP, f$ } from '#lib/data.js';
 
 	// One editable offer letter. Used in the hook and again in the final section,
 	// both bound to the same offer held by the page.
 	let { data, key, offer, onchange } = $props();
 
+	// The salary is changed only with the − / + buttons, one $5,000 step at a time.
 	const MIN = 20000;
 	const MAX = 300000;
-	const STEP = 1000;
 	const clamp = (v) => Math.max(MIN, Math.min(MAX, v));
+	const bump = (dir) => onchange({ salary: clamp(offer.salary + dir * SALARY_STEP) });
 
 	let cityOptions = $derived([...data.cities].sort((a, b) => a.city.localeCompare(b.city)));
 	let fieldOptions = $derived([ALL, ...data.fields]);
@@ -39,17 +40,19 @@
 	</select>
 	<p>with a starting salary of</p>
 	<div class="stepper">
-		<button type="button" aria-label="Decrease salary" onclick={() => onchange({ salary: clamp(offer.salary - STEP) })}>−</button>
-		<input
-			type="number"
-			aria-label="Salary for offer {key}"
-			min={MIN}
-			max={MAX}
-			step={STEP}
-			value={offer.salary}
-			onchange={(e) => onchange({ salary: clamp(+e.currentTarget.value || 0) })}
-		/>
-		<button type="button" aria-label="Increase salary" onclick={() => onchange({ salary: clamp(offer.salary + STEP) })}>+</button>
+		<button
+			type="button"
+			aria-label="Decrease offer {key} salary by {f$(SALARY_STEP)}"
+			disabled={offer.salary <= MIN}
+			onclick={() => bump(-1)}>−</button
+		>
+		<output class="salary" aria-live="polite" aria-label="Salary for offer {key}">{f$(offer.salary)}</output>
+		<button
+			type="button"
+			aria-label="Increase offer {key} salary by {f$(SALARY_STEP)}"
+			disabled={offer.salary >= MAX}
+			onclick={() => bump(1)}>+</button
+		>
 		<small>per year</small>
 	</div>
 </div>
@@ -113,12 +116,16 @@
 		cursor: pointer;
 		color: var(--ink-2);
 	}
-	.stepper input {
-		width: 120px;
+	.stepper button:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.salary {
+		min-width: 110px;
 		font-size: 20px;
 		font-weight: 650;
-		padding: 4px 8px;
-		text-align: right;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 	.stepper small {
 		color: var(--muted);

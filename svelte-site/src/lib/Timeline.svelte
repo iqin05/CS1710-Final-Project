@@ -3,20 +3,23 @@
 	import { ALL, f$, fK, fPct, fMo, fSav } from '#lib/data.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
-	// Months to a savings goal, one lane per metro. Changing the field or region "races" every
-	// marker from the start line; moving the goal slider glides them to their new spots.
-	let { data, offers } = $props();
+	// RISING INSIGHTS 5, the main insight: what's left each month, and how long to a savings goal.
+	// One lane per metro; the two offer cities' lanes are highlighted, and the cards above give each
+	// offer's own numbers at its offered salary. Changing the field or region "races" every marker
+	// from the start line; moving the goal slider glides them to their new spots.
+	// laneH: row height, so all 40 metros fit the pinned panel (the page sizes it to the screen).
+	let { data, offers, laneH = 22 } = $props();
+
+	const offerKey = (city) => (city === offers.A.city ? 'a' : city === offers.B.city ? 'b' : '');
 
 	const REGIONS = ['All regions', 'Northeast', 'Midwest', 'South', 'West'];
 	const M = { top: 26, right: 118, bottom: 6, left: 148 };
-	const LANE = 22;
 	const DIV = 34;
 	const RACE_MS = 1500;
 
 	let field = $derived(offers.A.field);
 	let region = $state('All regions');
 	let goal = $state(10000);
-	let pinned = $state(null);
 	let tableView = $state(false);
 	let chartW = $state(0);
 
@@ -58,6 +61,7 @@
 	let x = $derived(d3.scaleLinear().domain([0, cap]).range([0, innerW]));
 	let ticks = $derived(d3.range(0, cap + 0.1, cap <= 12 ? 3 : cap <= 24 ? 6 : 12));
 	let showDivider = $derived(never.length > 0 && finite.length > 0);
+	let LANE = $derived(laneH);
 	let height = $derived(M.top + rows.length * LANE + (showDivider ? DIV : 0) + M.bottom);
 	let divY = $derived(M.top + finite.length * LANE);
 	let yOf = $derived(
@@ -113,20 +117,29 @@
 		parts.push(['. ', false]);
 		if (never.length)
 			parts.push([`${never.length} metro${never.length === 1 ? '' : 's'} never get there because the budget exceeds take-home. `, false]);
-		const ny = rows.find((d) => d.city === 'New York');
-		const det = rows.find((d) => d.city === 'Detroit');
-		if (ny && det && ny.salary > det.salary) {
-			let tail = '.';
-			if (isFinite(ny.months) && isFinite(det.months)) tail = `, yet takes ${d3.format('.1f')(ny.months / det.months)}× longer to reach the goal.`;
-			else if (isFinite(det.months)) tail = `, yet never reaches the goal while Detroit does in ${fMo(det.months)}.`;
-			parts.push(['New York pays about ', false], [fK(ny.salary - det.salary) + ' more', true], [' than Detroit', false], [tail, false]);
+		// The two offer cities, on the same typical salaries as the lanes: the higher-paying one first.
+		// Skipped when either is outside the current field/region view, or both pay the same.
+		const a = rows.find((d) => d.city === offers.A.city);
+		const b = rows.find((d) => d.city === offers.B.city);
+		if (a && b && a !== b && a.salary !== b.salary) {
+			const [hi, lo] = a.salary > b.salary ? [a, b] : [b, a];
+			const x = (p, q) => d3.format('.1f')(p / q) + '×';
+			let tail;
+			if (isFinite(hi.months) && isFinite(lo.months))
+				tail =
+					hi.months > lo.months
+						? `, yet takes ${x(hi.months, lo.months)} longer to reach the goal.`
+						: `, and gets there ${hi.months < lo.months ? x(lo.months, hi.months) + ' faster' : 'just as fast'}.`;
+			else if (isFinite(lo.months)) tail = `, yet never reaches the goal while ${lo.city} does in ${fMo(lo.months)}.`;
+			else if (isFinite(hi.months)) tail = `, and reaches the goal in ${fMo(hi.months)} while ${lo.city} never does.`;
+			else tail = ', but neither reaches the goal.';
+			parts.push([`${hi.city} pays about `, false], [fK(hi.salary - lo.salary) + ' more', true], [` than ${lo.city}`, false], [tail, false]);
 		}
 		return parts;
 	});
 	let note = $derived(
 		`${rows.length} metro${rows.length === 1 ? '' : 's'} · goal ${f$(goal)}` + (missing ? ` · ${missing} without ${field} data` : '')
 	);
-	let detail = $derived(rows.find((r) => r.city === pinned));
 
 	// ---------- interaction ----------
 	function laneTip(e, d) {
@@ -147,20 +160,12 @@
 		const b = e.currentTarget.getBoundingClientRect();
 		laneTip({ clientX: b.left + M.left + 40, clientY: b.top }, d);
 	}
-	const pin = (city) => (pinned = pinned === city ? null : city);
 	function pickField(f) {
 		field = f;
-		pinned = null;
 	}
 </script>
 
-<section class="story" id="time">
-	<div class="wrap tl">
-		<h2 class="small">How long until your first $10,000?</h2>
-		<p class="lede">
-			Months it takes a new grad on a typical entry-level salary to save an emergency fund in each metro, after paying
-			for a modest single-adult budget. Pick a career field, narrow to a region, or change the goal.
-		</p>
+<div class="viz tl">
 		<div class="filters" role="group" aria-label="Filters">
 			<label>
 				Industry
@@ -201,7 +206,8 @@
 			</div>
 			<div class="legend" aria-hidden="true">
 				<span><i></i>metro, typical entry salary in the selected field</span>
-				<span><i class="acc"></i>pinned metro</span>
+				<span><i class="oa"></i>{offers.A.city} (Offer A)</span>
+				<span><i class="ob"></i>{offers.B.city} (Offer B)</span>
 				<span><i class="never"></i>never: budget exceeds take-home</span>
 			</div>
 			<div bind:clientWidth={chartW} hidden={tableView}>
@@ -224,24 +230,16 @@
 						{#each rows as d (d.city)}
 							<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 							<g
-								class="lane"
+								class="lane {offerKey(d.city) ? 'offer offer-' + offerKey(d.city) : ''}"
 								class:never={!isFinite(d.months)}
-								class:pinned={d.city === pinned}
 								style:transform="translate(0px, {yOf.get(d.city)}px)"
 								tabindex="0"
-								role="button"
+								role="img"
 								aria-label="{d.city}, {d.state}: {fMo(d.months)}"
 								onpointermove={(e) => laneTip(e, d)}
 								onpointerleave={hideTip}
 								onfocus={(e) => focusTip(e, d)}
 								onblur={hideTip}
-								onclick={() => pin(d.city)}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
-										pin(d.city);
-									}
-								}}
 							>
 								<rect class="hit" {width} height={LANE} rx="4" />
 								<text class="name" x={M.left - 10} y={LANE / 2} dy="0.34em" text-anchor="end"
@@ -306,7 +304,7 @@
 					</thead>
 					<tbody>
 						{#each rows as d (d.city)}
-							<tr class:pinned={d.city === pinned} onclick={() => pin(d.city)}>
+							<tr>
 								<td>{d.city}, {d.state}</td>
 								<td>{d.region}</td>
 								<td>{f$(d.salary)}</td>
@@ -320,59 +318,9 @@
 				</table>
 			{/if}
 		</section>
-		<section class="infocard" class:idle={!detail} aria-live="polite">
-			<div class="head">
-				<div>
-					{#if detail}
-						<h3>{detail.city}, {detail.state}</h3>
-						<p class="meta">
-							{detail.region} · {field === ALL ? 'all entry-level fields' : field} · goal {f$(goal)}
-						</p>
-					{:else}
-						<h3>{pinned ? `${pinned} is not in the current view` : 'Click a metro to pin its breakdown'}</h3>
-						<p class="meta">Hover any lane for the numbers; click to keep them here.</p>
-					{/if}
-				</div>
-				{#if detail}<button class="ghost" type="button" onclick={() => pin(detail.city)}>Clear</button>{/if}
-			</div>
-			{#if detail}
-				<div class="stats">
-					{#each [
-						[isFinite(detail.months) ? fMo(detail.months) : 'never', `to save ${f$(goal)}`],
-						[f$(detail.salary), 'entry salary, 25th pct'],
-						[f$(detail.take) + '/mo', 'est. take-home'],
-						[f$(detail.expenses) + '/mo', 'budget excl. taxes'],
-						[fSav(detail.savings) + '/mo', detail.savings < 0 ? 'monthly shortfall' : 'left to save'],
-						[fPct(detail.rentShare), 'rent share of take-home'],
-						[d3.format(',')(detail.jobs), field === ALL ? 'entry-level jobs' : `entry-level ${field} jobs`],
-						[detail.unemp.toFixed(1) + '%', 'unemployment, 2025'],
-						[fPct(detail.young), 'residents aged 20–29']
-					] as [v, l]}
-						<div class="stat"><b>{v}</b><span>{l}</span></div>
-					{/each}
-				</div>
-				<p class="budget">
-					Monthly budget:
-					{#each [
-						['housing (studio)', detail.housing],
-						['food', detail.food],
-						['transportation', detail.transport],
-						['healthcare', detail.health],
-						['other necessities', detail.other]
-					] as [l, v], i}{i ? ' · ' : ''}<b>{f$(v)}</b> {l}{/each}. Effective tax rate {fPct(detail.tax)}.
-				</p>
-			{/if}
-		</section>
-	</div>
-</section>
+</div>
 
 <style>
-	section.story {
-		padding-top: 36px;
-	}
-	h2.small {
-		font-size: 24px;
-	}
 	.insight {
 		margin: 0 0 14px;
 		color: var(--ink-2);
@@ -422,8 +370,11 @@
 		border-radius: 50%;
 		background: var(--series);
 	}
-	.legend i.acc {
-		background: var(--accent);
+	.legend i.oa {
+		background: var(--a);
+	}
+	.legend i.ob {
+		background: var(--b);
 	}
 	.legend i.never {
 		background: transparent;
@@ -443,7 +394,6 @@
 		font-size: 11px;
 	}
 	.lane {
-		cursor: pointer;
 		transition: transform 500ms;
 		outline: none;
 	}
@@ -485,20 +435,23 @@
 		fill: var(--surface);
 		stroke: var(--muted);
 	}
-	.lane.pinned .stem {
-		fill: var(--accent);
-	}
-	.lane.pinned .dot {
-		fill: var(--accent);
-	}
-	.lane.pinned.never .dot {
-		fill: var(--surface);
-		stroke: var(--accent);
-	}
-	.lane.pinned .name,
-	.lane.pinned .val {
+	/* The two offer cities' lanes. */
+	.lane.offer .name,
+	.lane.offer .val {
 		fill: var(--ink);
-		font-weight: 650;
+		font-weight: 700;
+	}
+	.lane.offer-a .stem,
+	.lane.offer-a .dot {
+		fill: var(--a);
+	}
+	.lane.offer-b .stem,
+	.lane.offer-b .dot {
+		fill: var(--b);
+	}
+	.lane.offer .hit {
+		fill: var(--grid);
+		fill-opacity: 0.35;
 	}
 	.divider text {
 		fill: var(--ink-2);
@@ -542,17 +495,5 @@
 		color: var(--ink-2);
 		font-weight: 600;
 		font-size: 12px;
-	}
-	tbody tr {
-		cursor: pointer;
-	}
-	tr.pinned td {
-		font-weight: 650;
-		color: var(--accent);
-	}
-	.budget {
-		margin: 12px 0 0;
-		font-size: 13px;
-		color: var(--ink-2);
 	}
 </style>

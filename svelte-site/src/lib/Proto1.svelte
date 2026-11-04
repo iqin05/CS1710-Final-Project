@@ -4,12 +4,15 @@
 	import { axis, gridAxis } from '#lib/axis.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
-	// PROTOTYPE 1: industry filter, top-15 bar chart, opportunity-vs-pay scatter, city card.
-	let { data, offers } = $props();
+	// Visual: job opportunities by industry. Industry filter plus one chart at a time, chosen by the
+	// story step: `view` 'bars' (top 15 cities) or 'scatter' (opportunity vs. pay). The two offer
+	// cities are marked throughout; the narrative lives in the step text.
+	let { data, offers, view = 'bars' } = $props();
 
 	// Follow Offer A until the reader picks something here.
 	let field = $derived(offers.A.field);
-	let sel = $derived(offers.A.city);
+	// A city the reader clicked (ringed); none to start, since the two offers are already marked.
+	let sel = $state(null);
 	let per1000 = $state(false);
 
 	let rows = $derived(
@@ -77,16 +80,14 @@
 			]
 		});
 	}
-	const markClass = (d) => (d.city === sel ? 'sel' : marks.has(d.city) ? 'mark' : '');
+	// Offer cities in their offer colors (A blue, B orange, as everywhere in the story); a clicked city
+	// gets a dark ring.
+	const markClass = (d) =>
+		[d.city === offers.A.city ? 'oa' : d.city === offers.B.city ? 'ob' : '', d.city === sel ? 'picked' : ''].join(' ');
+
 </script>
 
-<section class="story" id="jobs">
-	<div class="wrap">
-		<h2 class="small">Which cities have the most entry-level jobs, for you?</h2>
-		<p class="lede">
-			40 U.S. metros. Jobs in occupations that typically need a bachelor's degree and no experience (BLS, May 2025).
-			Pick an industry; click any city in either chart. Your two offer cities are marked.
-		</p>
+<div class="viz">
 		<div class="filters">
 			<label>
 				Industry
@@ -99,7 +100,7 @@
 				<button type="button" aria-pressed={per1000} onclick={() => (per1000 = true)}>Per 1,000 local jobs</button>
 			</div>
 		</div>
-		<div class="grid2">
+		{#if view === 'bars'}
 			<div class="card">
 				<h3>Top 15 cities by opportunity</h3>
 				<p class="sub">{per1000 ? 'Entry-level jobs per 1,000 local jobs' : 'Entry-level jobs'}, {fieldLabel(field)}</p>
@@ -114,7 +115,7 @@
 							onpointerleave={hideTip}
 						>
 							<rect class={markClass(d)} x={BM.l} y="2" height={BH_ROW - 4} rx="3" style:width="{bx(metric(d))}px" />
-							<text class="name" class:sel={d.city === sel} x={BM.l - 8} y={BH_ROW / 2} dy="0.34em" text-anchor="end"
+							<text class="name" class:sel={d.city === sel || marks.has(d.city)} x={BM.l - 8} y={BH_ROW / 2} dy="0.34em" text-anchor="end"
 								>{d.city}{marks.has(d.city) ? ' ●' : ''}</text
 							>
 							<text class="v" x={BM.l + bx(metric(d)) + 6} y={BH_ROW / 2} dy="0.34em"
@@ -124,6 +125,7 @@
 					{/each}
 				</svg>
 			</div>
+		{:else}
 			<div class="card">
 				<h3>Opportunity vs. pay</h3>
 				<p class="sub">Each dot is a metro · x: entry-level jobs (log) · y: 25th-pct salary in the field</p>
@@ -145,44 +147,32 @@
 						/>
 					{/each}
 					{#each rows.filter((d) => d.city === sel || marks.has(d.city)) as d (d.city)}
-						<text class="dotlbl" class:sel={d.city === sel} x={sx(metric(d)) + 9} y={sy(d.fsal) - 8}>{d.city}</text>
+						<text class="dotlbl" class:sel={marks.has(d.city)} x={sx(metric(d)) + 9} y={sy(d.fsal) - 8}>{d.city}</text>
 					{/each}
 				</svg>
 			</div>
-		</div>
-		{#if selected}
-			<div class="infocard">
-				<h3>{selected.city}, {selected.state}</h3>
-				<p class="meta">{selected.region} · {fieldLabel(field)}</p>
-				<div class="stats">
-					{#each [
-						[fN(selected.fjobs), 'entry-level jobs'],
-						[f$(selected.fsal), '25th-pct salary'],
-						[f$(Math.round(selected.fsal / (selected.rpp / 100))), 'salary, COL-adjusted'],
-						[fSav(selected.fsav) + '/mo', 'est. savings'],
-						[fMo(selected.fsav > 0 ? 10000 / selected.fsav : Infinity), 'to save $10k'],
-						[f$(selected.rent1br), 'median 1-br rent'],
-						[selected.unemp.toFixed(1) + '%', "unemployment '25"],
-						[fPct(selected.young), 'residents age 20-29']
-					] as [v, l]}
-						<div class="stat"><b>{v}</b><span>{l}</span></div>
-					{/each}
-				</div>
-			</div>
-		{:else}
-			<div class="infocard idle">
-				{sel} has no {field} data. Click a bubble or a bar to see a city's profile.
-			</div>
 		{/if}
-	</div>
-</section>
+</div>
 
 <style>
-	section.story {
-		padding-top: 36px;
+	.hbar rect.oa,
+	.dot.oa {
+		fill: var(--a);
+		fill-opacity: 1;
 	}
-	h2.small {
-		font-size: 24px;
+	.hbar rect.ob,
+	.dot.ob {
+		fill: var(--b);
+		fill-opacity: 1;
+	}
+	/* Offer and clicked cities' names in ink, bold: their bars carry the color. */
+	.hbar text.name.sel {
+		fill: var(--ink);
+	}
+	.hbar rect.picked,
+	.dot.picked {
+		stroke: var(--ink);
+		stroke-width: 2;
 	}
 	.row {
 		transition: transform 300ms;

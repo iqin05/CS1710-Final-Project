@@ -54,7 +54,10 @@ export function cityRow(r) {
 		colAdj: num(r.salary_col_adjusted),
 		rpp: num(r.rpp_all_items, 1),
 		commute: num(r.mean_commute_min, 1),
-		transit: num(r.pct_commute_transit, 3)
+		transit: num(r.pct_commute_transit, 3),
+		walk: num(r.pct_commute_walk, 3),
+		wfh: num(r.pct_work_from_home, 3),
+		driveAlone: num(r.pct_commute_drive_alone, 3)
 	};
 }
 
@@ -86,6 +89,21 @@ export function fieldRow(data, city, field) {
 	if (!c) return null;
 	if (field === ALL) return { salary: c.salary, take: c.take, savings: c.savings, jobs: c.jobs };
 	return data.byField[city]?.[field] ?? null;
+}
+
+/**
+ * A metro's career fields ranked by entry-level jobs, largest first (the catch-all "Other" left
+ * out): [{ field, jobs, share }], where share is the field's part of all the metro's entry-level jobs.
+ */
+export function fieldShares(data, city) {
+	const c = data.byCity[city];
+	return data.fields
+		.filter((f) => f !== 'Other')
+		.map((f) => {
+			const jobs = data.byField[city]?.[f]?.jobs ?? 0;
+			return { field: f, jobs, share: jobs / c.jobs };
+		})
+		.sort((a, b) => b.jobs - a.jobs);
 }
 
 /** Monthly economics for any salary in a metro; same formula as the dataset's derived columns. */

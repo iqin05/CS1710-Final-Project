@@ -1,7 +1,8 @@
 <script>
-	import { ALL, f$, fPct, fN, fMo, fSav, calc, fieldRow } from '#lib/data.js';
+	import { ALL, f$, fPct, fN, fMo, fSav, calc, fieldRow, fieldShares } from '#lib/data.js';
 
-	// RISING INSIGHTS: the two offers side by side at the offered salaries.
+	// NEXT STEPS: the two offers side by side with every factor the story covered, at the offered
+	// salaries. Savings and time to $10,000 lead and are highlighted; the rest follow in story order.
 	let { data, offers } = $props();
 
 	let A = $derived(calc(data, offers.A.city, offers.A.salary));
@@ -11,162 +12,172 @@
 	let keeper = $derived(A.savings >= B.savings ? A : B);
 
 	let lede = $derived(
-		hi === keeper
-			? `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more and also leaves more at the end of the month, by ${f$(hi.savings - lo.savings)}. Here the bigger number happens to win, but look at how much of it the budget eats.`
-			: `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more a year, yet ${lo.c.city} leaves ${f$(lo.savings - hi.savings)} more in your pocket every month. The gap is cost, not pay.`
+		A.c === B.c
+			? `Both offers are in ${A.c.city}, so the higher salary simply keeps more.`
+			: hi === keeper
+				? `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more and also leaves ${f$(hi.savings - lo.savings)} more at the end of each month. Here the bigger number wins, but weigh the rest of the picture too.`
+				: `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more a year, yet ${lo.c.city} leaves ${f$(lo.savings - hi.savings)} more in your pocket every month. The gap is cost, not pay.`
 	);
 
-	function stats(r, o) {
-		const fr = fieldRow(data, o.city, o.field) ?? fieldRow(data, o.city, ALL);
-		return [
-			[f$(r.take) + '/mo', 'est. take-home'],
-			[f$(r.c.expenses) + '/mo', 'modest budget, excl. taxes'],
-			[fSav(r.savings) + '/mo', r.savings < 0 ? 'monthly shortfall' : 'left to save'],
-			[fMo(r.months), 'to save $10,000'],
-			[fPct(r.rentShare), 'rent share of take-home'],
-			[fN(fr.jobs), o.field === ALL ? 'entry-level jobs' : `entry-level ${o.field} jobs`],
-			[r.c.unemp.toFixed(1) + '%', 'unemployment, 2025'],
-			[fPct(r.c.young), 'residents aged 20–29']
-		];
+	// Field standing: rank among the city's fields and jobs in the offer's field.
+	function fieldInfo(o) {
+		if (o.field === ALL) return { rank: '—', jobs: fieldRow(data, o.city, ALL).jobs, label: 'all fields' };
+		const rows = fieldShares(data, o.city);
+		const i = rows.findIndex((r) => r.field === o.field);
+		return { rank: i >= 0 ? `#${i + 1} of ${rows.length}` : 'not reported', jobs: rows[i]?.jobs ?? 0, label: o.field };
 	}
+	const carFree = (c) => c.transit + c.walk;
 
-	// Both offers' bars share one dollar scale.
-	let max = $derived(Math.max(A.take, B.take, A.c.expenses, B.c.expenses) * 1.05);
-	const barRows = (r) => [
-		['Take-home pay', r.take],
-		['Rent (studio)', r.housing],
-		['Rest of budget', r.rest],
-		[r.savings < 0 ? 'Shortfall' : 'Left to save', r.savings]
-	];
-	let pair = $derived([
-		['A', A, offers.A],
-		['B', B, offers.B]
-	]);
+	// One row per factor: label, the two values, and which side is better (for a subtle mark) when
+	// "better" is clear. Savings rows come first and are highlighted.
+	let rows = $derived.by(() => {
+		const fa = fieldInfo(offers.A);
+		const fb = fieldInfo(offers.B);
+		const better = (va, vb, lowerIsBetter = false) =>
+			va === vb ? null : (lowerIsBetter ? va < vb : va > vb) ? 'A' : 'B';
+		return [
+			{ key: 'save', label: 'Left to save each month', a: fSav(A.savings), b: fSav(B.savings), win: better(A.savings, B.savings), hero: true },
+			{
+				key: 'months',
+				label: 'Time to save $10,000',
+				a: fMo(A.months),
+				b: fMo(B.months),
+				win: better(A.months, B.months, true),
+				hero: true
+			},
+			{ key: 'salary', label: 'Salary', a: f$(A.salary) + '/yr', b: f$(B.salary) + '/yr', win: better(A.salary, B.salary) },
+			{ key: 'take', label: 'Take-home pay (after taxes)', a: f$(A.take) + '/mo', b: f$(B.take) + '/mo', win: better(A.take, B.take) },
+			{
+				key: 'rent',
+				label: 'Studio rent',
+				a: `${f$(A.housing)}/mo · ${fPct(A.rentShare)} of take-home`,
+				b: `${f$(B.housing)}/mo · ${fPct(B.rentShare)} of take-home`,
+				win: better(A.rentShare, B.rentShare, true)
+			},
+			{ key: 'rest', label: 'Everyday costs (food, car, health, other)', a: f$(A.rest) + '/mo', b: f$(B.rest) + '/mo', win: better(A.rest, B.rest, true) },
+			{
+				key: 'field',
+				label: 'Your field in the city',
+				a: offers.A.field === ALL ? 'any field (none named)' : `${fa.label} · ${fa.rank} by jobs`,
+				b: offers.B.field === ALL ? 'any field (none named)' : `${fb.label} · ${fb.rank} by jobs`,
+				win: null
+			},
+			{ key: 'jobs', label: 'Entry-level jobs in your field', a: fN(fa.jobs), b: fN(fb.jobs), win: better(fa.jobs, fb.jobs) },
+			{
+				key: 'commute',
+				label: 'Commute',
+				a: `${Math.round(A.c.commute)} min · ${fPct(carFree(A.c))} car-free`,
+				b: `${Math.round(B.c.commute)} min · ${fPct(carFree(B.c))} car-free`,
+				win: better(A.c.commute, B.c.commute, true)
+			},
+			{ key: 'unemp', label: 'Unemployment (2025)', a: A.c.unemp.toFixed(1) + '%', b: B.c.unemp.toFixed(1) + '%', win: better(A.c.unemp, B.c.unemp, true) },
+			{ key: 'young', label: 'Residents aged 20–29', a: fPct(A.c.young), b: fPct(B.c.young), win: null }
+		];
+	});
 </script>
 
-<section class="story" id="compare">
-	<div class="wrap">
-		<h2>Put the two offers side by side</h2>
-		<p class="lede">{lede}</p>
-		<div class="compare">
-			{#each pair as [k, r, o] (k)}
-				<div class="offer {k.toLowerCase()}">
-					<div class="tag"><i></i>Offer {k} · {r.c.city}, {r.c.state}</div>
-					<h3>{f$(r.salary)} a year</h3>
-					<div class="stats">
-						{#each stats(r, o) as [v, l]}
-							<div class="stat"><b>{v}</b><span>{l}</span></div>
-						{/each}
-					</div>
-				</div>
-			{/each}
-		</div>
-		<div class="card bars">
-			<h3>What each paycheck covers in a month</h3>
-			<p class="sub">
-				Estimated take-home at the offered salary against EPI's modest single-adult budget for that metro. Bars are
-				on one shared dollar scale.
+<div class="viz">
+		<div class="card table-card">
+			<table>
+				<caption class="sr">The two offers compared on every factor in the story</caption>
+				<thead>
+					<tr>
+						<th scope="col"></th>
+						<th scope="col" class="a"><i></i>Offer A · {A.c.city}, {A.c.state}</th>
+						<th scope="col" class="b"><i></i>Offer B · {B.c.city}, {B.c.state}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each rows as r (r.key)}
+						<tr class:hero={r.hero}>
+							<th scope="row">{r.label}</th>
+							<td class:win={r.win === 'A'}>{r.a}</td>
+							<td class:win={r.win === 'B'}>{r.b}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+			<p class="note">
+				Bold marks the stronger side where one is clearly better. Savings already subtracts taxes, rent and everyday
+				costs, which is why it leads.
 			</p>
-			{#each pair as [k, r] (k)}
-				<div class="bar-title">Offer {k} · {r.c.city}</div>
-				{#each barRows(r) as [l, v]}
-					<div class="bar-row {k.toLowerCase()}">
-						<span class="lbl">{l}</span>
-						<div class="track">
-							<div class="fill" class:neg={v < 0} style:width="{Math.min(100, (Math.abs(v) / max) * 100)}%"></div>
-						</div>
-						<span class="val">{fSav(v)}</span>
-					</div>
-				{/each}
-			{/each}
 		</div>
-	</div>
-</section>
+</div>
 
 <style>
-	.compare {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16px;
+	.table-card {
+		padding: 6px 18px 14px;
+		overflow-x: auto;
 	}
-	@media (max-width: 760px) {
-		.compare {
-			grid-template-columns: 1fr;
-		}
+	table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 14px;
 	}
-	.offer {
-		border: 1px solid var(--border);
-		border-top: 4px solid var(--a);
-		border-radius: 12px;
-		background: var(--surface);
-		padding: 14px 16px;
+	.sr {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
 	}
-	.offer.b {
-		border-top-color: var(--b);
-	}
-	.tag {
+	thead th {
+		text-align: left;
 		font-size: 11px;
-		letter-spacing: 0.12em;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		font-weight: 700;
-		display: flex;
-		align-items: center;
-		gap: 6px;
 		color: var(--ink-2);
+		padding: 12px 10px 8px;
+		border-bottom: 1px solid var(--border);
 	}
-	.tag i {
+	thead th i {
+		display: inline-block;
 		width: 9px;
 		height: 9px;
 		border-radius: 50%;
 		background: var(--a);
-		display: inline-block;
+		margin-right: 6px;
 	}
-	.offer.b .tag i {
+	thead th.b i {
 		background: var(--b);
 	}
-	.offer h3 {
-		margin: 6px 0 10px;
-		font-size: 22px;
-	}
-	.bars {
-		margin-top: 16px;
-	}
-	.bar-title {
-		font-weight: 650;
-		margin: 10px 0 2px;
-	}
-	.bar-row {
-		display: grid;
-		grid-template-columns: 140px 1fr 90px;
-		gap: 10px;
-		align-items: center;
-		font-size: 13px;
-		margin: 6px 0;
-	}
-	.lbl {
+	tbody th {
+		text-align: left;
+		font-weight: 500;
 		color: var(--ink-2);
+		padding: 9px 10px;
+		width: 30%;
 	}
-	.val {
-		text-align: right;
+	td {
+		padding: 9px 10px;
+		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
-		font-weight: 600;
 	}
-	.track {
-		height: 12px;
+	tbody tr + tr {
+		border-top: 1px solid var(--grid);
+	}
+	td.win {
+		color: var(--ink);
+		font-weight: 650;
+	}
+	/* The savings rows lead, larger and on a tinted band. */
+	tr.hero {
 		background: var(--mid);
-		border-radius: 4px;
-		overflow: hidden;
 	}
-	.fill {
-		height: 100%;
-		background: var(--series);
-		border-radius: 0 4px 4px 0;
-		transition: width 300ms;
+	tr.hero th {
+		color: var(--ink);
+		font-weight: 650;
 	}
-	.bar-row.b .fill {
-		background: var(--accent);
+	tr.hero td {
+		font-size: 20px;
+		color: var(--ink);
 	}
-	.fill.neg {
-		background: var(--neg);
+	tr.hero td.win {
+		font-weight: 750;
+	}
+	.note {
+		margin: 10px 0 0;
+		font-size: 12px;
+		color: var(--muted);
 	}
 </style>

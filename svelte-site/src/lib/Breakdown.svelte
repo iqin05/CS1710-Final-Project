@@ -41,13 +41,7 @@
 	]);
 </script>
 
-<section class="story" id="offer">
-	<div class="wrap">
-		<h2 class="small">Now look at the two offers with the full picture</h2>
-		<p class="lede">
-			Edit either offer: the salary, the city, or the field. Each bar splits one month of pay into rent, the rest of
-			the budget, taxes, and what is left to save.
-		</p>
+<div class="viz">
 		<div class="grid2">
 			{#each ['A', 'B'] as k}
 				<OfferEditor {data} key={k} offer={offers[k]} onchange={(patch) => setOffer(k, patch)} />
@@ -84,8 +78,7 @@
 			{/each}
 		</div>
 		<p class="prose verdict">{verdict}</p>
-	</div>
-</section>
+</div>
 
 <style>
 	section.story {

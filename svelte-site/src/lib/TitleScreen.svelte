@@ -62,7 +62,7 @@
 					// stay are side by side. The tiny jitter breaks ties between the two ends of a row.
 					order: r + (Math.abs(j - (k - 1) / 2) / k) * 0.8 + rand(i, salt) * 0.05,
 					start: 0,
-					dur: 0.12,
+					dur: 0.16,
 					spin: (rand(i, salt + 1) - 0.5) * 50,
 					falls: false,
 					cat: 0
@@ -134,17 +134,25 @@
 		return { dx: (VW * (2 * b.cat + 1)) / 6 - bx, dy: VH + 16 - by };
 	}
 
-	// A falling bundle drops (accelerating) and slides toward its label, shrinking and fading as it
-	// arrives. With reduced motion it just fades where it is.
+	// A falling bundle pops up off the pile, then floats down past its label like a dropped bill:
+	// a projectile arc (a quick hop, then gravity), drifting sideways toward its label with a gentle
+	// sway and a slow spin, fading out over the second half of the fall. It keeps its full size the
+	// whole way. With reduced motion it just fades where it is.
+	const HOP = 120; // initial upward speed, in SVG units per unit of t
+	const PAST = 40; // how far below the label row it drifts before it's gone
 	function look(p, b) {
 		const t = q(b);
 		if (!b.falls || t === 0) return { transform: 'none', opacity: 1 };
 		if (reduced) return { transform: 'none', opacity: 1 - t };
 		const { dx, dy } = target(p, b);
-		const ease = 1 - (1 - t) * (1 - t);
+		// y(t) = -HOP·t + g·t², with g set so the bundle ends PAST units below its label.
+		const g = dy + PAST + HOP;
+		const y = -HOP * t + g * t * t;
+		const drift = t * t * (3 - 2 * t); // smooth start and finish
+		const sway = Math.sin(t * Math.PI * 2.2 + b.i) * 7 * t;
 		return {
-			transform: `translate(${dx * ease}px, ${dy * t * t}px) rotate(${b.spin * t}deg) scale(${1 - 0.45 * t})`,
-			opacity: t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3
+			transform: `translate(${dx * drift + sway}px, ${y}px) rotate(${b.spin * t}deg)`,
+			opacity: t < 0.45 ? 1 : 1 - (t - 0.45) / 0.55
 		};
 	}
 

@@ -25,18 +25,32 @@ there is no `data.js` step.
 
 ## Where things are
 
+The page follows the storyboard in four stages, each scrollytelling (text left, visual right); visuals are listed in story order. The step text for the last three stages is in `+page.svelte` (snippets) and `story.js`.
+
 | File | Section |
 | --- | --- |
-| `src/routes/+page.svelte` | Title screen, the four storyboard beats, footer, and the two offers every section shares |
-| `src/lib/Scrolly.svelte` | Scroll index (Scrollama): one step per beat (Hook, Rising insights, Main message, Solution), step-indicator controls |
-| `src/lib/Hook.svelte` | Hook: map with the two offer cities, offer letters, randomize/reset |
-| `src/lib/Compare.svelte` | Rising insights: the two offers side by side |
-| `src/lib/Proto1.svelte` | Jobs: top-15 bars, opportunity vs. pay scatter, city card |
-| `src/lib/Message.svelte` | Main message: hero numbers and salary-vs-savings scatter |
-| `src/lib/Heatmap.svelte` | Field × city savings heatmap |
-| `src/lib/Proto2.svelte` | Explore: brushable bubble map, linked bars, city card |
-| `src/lib/Timeline.svelte` | Months to the first $10K |
-| `src/lib/Breakdown.svelte` | Final paycheck breakdown and verdict |
+| `src/routes/+page.svelte` | Section order, footer, and the two offers every section shares |
+| `src/routes/+page.server.js` | Build-time default offers, so the title screen draws in the first paint |
+| `src/lib/TitleScreen.svelte` | Title screen: two piles of cash that fall into taxes, rent and everyday costs |
+| `src/lib/Scrolly.svelte` | Scroll index (Scrollama): one step per stage, step-indicator controls |
+| `src/lib/StepStory.svelte` | One stage as scrollytelling (Scrollama): text steps left, pinned visual right, cross-fades |
+| `src/lib/story.js` | The step text, computed from the data and the reader's offers |
+| **Hook** | |
+| `src/lib/Hook.svelte` | Full-screen zoomable map with three scroll cards and the offer letters |
+| **Rising insights** (the two offer cities highlighted among all 40) | |
+| `src/lib/Proto1.svelte` | Jobs in your field: top-15 bars, then opportunity vs. pay (one chart per step) |
+| `src/lib/Industries.svelte` | What each offer city hires everyone for; the offer's field highlighted |
+| `src/lib/Rent.svelte` | Studio rent vs. rent share of take-home pay |
+| `src/lib/Commute.svelte` | Commute time vs. share commuting without a car |
+| `src/lib/Timeline.svelte` | Savings per month and months to the first $10K |
+| **Main message** | |
+| `src/lib/Message.svelte` | Compare by savings, not salary: salary-vs-savings scatter, colored by region |
+| **Next steps** | |
+| `src/lib/Compare.svelte` | The two offers side by side on every factor, savings first |
+| `src/lib/Breakdown.svelte` | Offer letters, paycheck breakdowns and verdict |
+| **Shared** | |
 | `src/lib/OfferEditor.svelte` | Offer letter used in the hook and the final section |
-| `src/lib/data.js` | CSV loading, formatters, savings formula (`calc`) |
+| `src/lib/data.js` | CSV loading, formatters, savings formula (`calc`), field ranking (`fieldShares`) |
 | `src/lib/geo.js`, `axis.js`, `tooltip.svelte.js`, `Tooltip.svelte` | Map projection, axis helper, shared tooltip |
+| *Not on the page* | |
+| `src/lib/Heatmap.svelte`, `src/lib/Proto2.svelte` | Field × city savings heatmap and brushable explore map, kept for reuse |

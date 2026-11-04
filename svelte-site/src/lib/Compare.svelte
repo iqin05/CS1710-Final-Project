@@ -46,7 +46,6 @@
 
 <section class="story" id="compare">
 	<div class="wrap">
-		<p class="beat">Rising insights</p>
 		<h2>Put the two offers side by side</h2>
 		<p class="lede">{lede}</p>
 		<div class="compare">

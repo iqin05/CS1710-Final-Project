@@ -26,7 +26,7 @@ export const fSav = (v) => (v < 0 ? '−' : '') + f$(Math.abs(v));
 const num = (v, nd = 0) => (nd ? +(+v).toFixed(nd) : Math.round(+v));
 
 // Every CSV value arrives as a string; convert to the short keys the views use.
-function cityRow(r) {
+export function cityRow(r) {
 	return {
 		city: r.city,
 		state: r.state,
@@ -115,6 +115,18 @@ export const roundSalary = (v) => Math.round(v / SALARY_STEP) * SALARY_STEP;
 export function offerAt(data, city, field) {
 	const r = fieldRow(data, city, field) ?? fieldRow(data, city, ALL);
 	return { city, field, salary: roundSalary(r.salary) };
+}
+
+/**
+ * What the title screen needs for each offer: a year of spending at the offered salary, split into
+ * taxes, rent, and everyday costs (the rest of the metro's budget). Needs only `data.byCity`.
+ */
+export function titleEcon(data, offers) {
+	const one = (o) => {
+		const m = calc(data, o.city, o.salary);
+		return { taxes: m.taxes * 12, rent: m.housing * 12, everyday: m.rest * 12 };
+	};
+	return { A: one(offers.A), B: one(offers.B) };
 }
 
 /** The opening pair: New York vs. Detroit, any field, at their local entry-level salaries. */

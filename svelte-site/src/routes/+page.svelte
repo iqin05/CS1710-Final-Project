@@ -1,6 +1,9 @@
 <script>
+	// From +page.server.js at build time: the default offers, so the title screen draws immediately.
+	let { data: prerendered } = $props();
+
 	import { onMount } from 'svelte';
-	import { loadData, offerAt, defaultOffers } from '#lib/data.js';
+	import { loadData, offerAt, defaultOffers, titleEcon } from '#lib/data.js';
 	import Tooltip from '#lib/Tooltip.svelte';
 	import Hook from '#lib/Hook.svelte';
 	import Compare from '#lib/Compare.svelte';
@@ -11,13 +14,14 @@
 	import Timeline from '#lib/Timeline.svelte';
 	import Breakdown from '#lib/Breakdown.svelte';
 	import Scrolly from '#lib/Scrolly.svelte';
+	import TitleScreen from '#lib/TitleScreen.svelte';
 
 	// The scroll index: one step per storyboard beat.
 	const BEATS = [
-		{ id: 'hook', label: 'Hook' },
-		{ id: 'rising', label: 'Rising insights' },
-		{ id: 'message', label: 'Main message' },
-		{ id: 'solution', label: 'Solution / next steps' }
+		{ id: 'hook' },
+		{ id: 'rising' },
+		{ id: 'message' },
+		{ id: 'solution' }
 	];
 
 	let data = $state(null);
@@ -68,15 +72,10 @@
 	/>
 </svelte:head>
 
-<header class="title-screen">
-	<h1>Beyond the First Paycheck</h1>
-	<a class="cue" href="#hook">
-		<span>Scroll to begin</span>
-		<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-			<path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-		</svg>
-	</a>
-</header>
+<TitleScreen
+	offers={offers ?? prerendered.initialOffers}
+	econ={data && offers ? titleEcon(data, offers) : prerendered.initialEcon}
+/>
 
 {#if error}
 	<p class="wrap status">Could not load data: {error}</p>
@@ -120,58 +119,6 @@
 </footer>
 
 <style>
-	.title-screen {
-		min-height: 100vh;
-		min-height: 100svh;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 0 16px;
-		text-align: center;
-		position: relative;
-	}
-	.title-screen h1 {
-		font-size: clamp(40px, 8vw, 96px);
-		line-height: 1.02;
-		letter-spacing: -0.025em;
-		max-width: 12ch;
-		margin: 0;
-	}
-	.cue {
-		position: absolute;
-		bottom: 32px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-		font-size: 12px;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		font-weight: 650;
-		color: var(--muted);
-		text-decoration: none;
-	}
-	.cue:hover {
-		color: var(--ink);
-	}
-	.cue svg {
-		animation: nudge 1.8s ease-in-out infinite;
-	}
-	@keyframes nudge {
-		0%,
-		100% {
-			transform: translateY(0);
-		}
-		50% {
-			transform: translateY(5px);
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.cue svg {
-			animation: none;
-		}
-	}
 	.status {
 		padding-top: 40px;
 		color: var(--ink-2);

@@ -55,12 +55,11 @@
 	{#each steps as s, i (s.id)}
 		<button
 			class="dot"
-			aria-label="Step {i + 1} of {steps.length}: {s.label}"
+			aria-label="Step {i + 1} of {steps.length}"
 			aria-current={i === active ? 'step' : undefined}
 			onclick={() => goTo(i)}
 		>
 			<span class="circle"></span>
-			<span class="name">{s.label}</span>
 		</button>
 	{/each}
 	<button class="arrow" aria-label="Next step" disabled={active === steps.length - 1} onclick={() => goTo(active + 1)}>
@@ -78,7 +77,7 @@
 		opacity: 0.4;
 	}
 
-	/* Wide screens: a vertical rail in the right margin. Hover or focus a step to see its name. */
+	/* Wide screens: a vertical rail in the right margin. */
 	.controls {
 		position: fixed;
 		right: 16px;
@@ -104,45 +103,25 @@
 		cursor: pointer;
 		color: var(--ink-2);
 	}
-	/* Each step is a large circle; the active one fills in. The button pads it to a 40px target. */
+	/* Each step is a circle; the active one fills in. The button pads it to a 28px target. */
 	.dot {
+		position: relative;
 		display: flex;
-		flex-direction: row-reverse;
 		align-items: center;
-		gap: 6px;
-		padding: 8px;
+		padding: 7px;
 		border: 0;
 		background: none;
 	}
 	.circle {
-		width: 24px;
-		height: 24px;
+		width: 14px;
+		height: 14px;
 		border-radius: 50%;
-		border: 2px solid var(--axis);
+		border: 1.5px solid var(--axis);
 		background: var(--control);
 		transition:
 			background 200ms,
 			border-color 200ms,
 			transform 200ms;
-	}
-	.name {
-		font-size: 12px;
-		padding: 3px 8px;
-		border-radius: 999px;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		white-space: nowrap;
-		opacity: 0;
-		transform: translateX(4px);
-		transition:
-			opacity 200ms,
-			transform 200ms;
-		pointer-events: none;
-	}
-	.dot:hover .name,
-	.dot:focus-visible .name {
-		opacity: 1;
-		transform: none;
 	}
 	.dot:hover:not([aria-current]) .circle {
 		border-color: var(--ink-2);
@@ -150,11 +129,11 @@
 	.dot[aria-current='step'] .circle {
 		background: var(--control-active);
 		border-color: var(--control-active);
-		transform: scale(1.15);
+		transform: scale(1.2);
 	}
 	.arrow {
-		width: 40px;
-		height: 40px;
+		width: 28px;
+		height: 28px;
 		padding: 0;
 		border: 0;
 		background: none;
@@ -163,11 +142,11 @@
 		color: var(--ink-2);
 	}
 	.arrow svg {
-		width: 32px;
-		height: 32px;
+		width: 20px;
+		height: 20px;
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 2.5;
+		stroke-width: 2.25;
 		stroke-linecap: round;
 		stroke-linejoin: round;
 		transition: transform 200ms;
@@ -185,7 +164,7 @@
 		border-radius: 999px;
 	}
 
-	/* Without a margin wide enough for the rail: a pill pinned to the bottom, names hidden. */
+	/* Without a margin wide enough for the rail: a pill pinned to the bottom. */
 	@media (max-width: 1239px) {
 		.controls {
 			top: auto;
@@ -199,9 +178,6 @@
 			border-radius: 999px;
 			background: var(--surface);
 			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-		}
-		.name {
-			display: none;
 		}
 		/* The chevrons point up/down on the rail; turn them to point left/right in the pill. */
 		.arrow svg {

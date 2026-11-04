@@ -74,7 +74,6 @@
 
 <section class="story" id="explore">
 	<div class="wrap">
-		<p class="beat">Solution / next steps</p>
 		<h2>Before you accept, put the offer through the tool</h2>
 		<p class="lede">Start with where the jobs are. Pick an industry, choose a region, or drag a box on the map.</p>
 		<div class="filters">

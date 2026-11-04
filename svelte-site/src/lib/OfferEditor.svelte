@@ -12,7 +12,8 @@
 	const bump = (dir) => onchange({ salary: clamp(offer.salary + dir * SALARY_STEP) });
 
 	let cityOptions = $derived([...data.cities].sort((a, b) => a.city.localeCompare(b.city)));
-	let fieldOptions = $derived([ALL, ...data.fields]);
+	// "Other" is a catch-all of unrelated jobs, so it isn't offered as a field.
+	let fieldOptions = $derived([ALL, ...data.fields.filter((f) => f !== 'Other')]);
 </script>
 
 <div class="offer {key.toLowerCase()}">

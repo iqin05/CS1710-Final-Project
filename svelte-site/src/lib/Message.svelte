@@ -66,7 +66,6 @@
 <section class="story" id="message">
 	<div class="wrap">
 		<div class="hero">
-			<p class="beat">Main message</p>
 			<h2>Recent graduates should compare cities by how much they can save, not just what they earn.</h2>
 			<p>{story.text}</p>
 			<div class="nums">
@@ -130,9 +129,6 @@
 		border-radius: 16px;
 		padding: 40px 36px;
 		margin: 10px 0 18px;
-	}
-	.hero .beat {
-		color: #f0b391;
 	}
 	.hero h2 {
 		color: var(--hero-ink);

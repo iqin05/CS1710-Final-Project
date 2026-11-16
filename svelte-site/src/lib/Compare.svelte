@@ -7,18 +7,6 @@
 
 	let A = $derived(calc(data, offers.A.city, offers.A.salary));
 	let B = $derived(calc(data, offers.B.city, offers.B.salary));
-	let hi = $derived(A.salary >= B.salary ? A : B);
-	let lo = $derived(hi === A ? B : A);
-	let keeper = $derived(A.savings >= B.savings ? A : B);
-
-	let lede = $derived(
-		A.c === B.c
-			? `Both offers are in ${A.c.city}, so the higher salary simply keeps more.`
-			: hi === keeper
-				? `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more and also leaves ${f$(hi.savings - lo.savings)} more at the end of each month. Here the bigger number wins, but weigh the rest of the picture too.`
-				: `${hi.c.city} pays ${f$(hi.salary - lo.salary)} more a year, yet ${lo.c.city} leaves ${f$(lo.savings - hi.savings)} more in your pocket every month. The gap is cost, not pay.`
-	);
-
 	// Field standing: rank among the city's fields and jobs in the offer's field.
 	function fieldInfo(o) {
 		if (o.field === ALL) return { rank: '—', jobs: fieldRow(data, o.city, ALL).jobs, label: 'all fields' };
@@ -36,7 +24,7 @@
 		const better = (va, vb, lowerIsBetter = false) =>
 			va === vb ? null : (lowerIsBetter ? va < vb : va > vb) ? 'A' : 'B';
 		return [
-			{ key: 'save', label: 'Left to save each month', a: fSav(A.savings), b: fSav(B.savings), win: better(A.savings, B.savings), hero: true },
+			{ key: 'save', label: 'What’s Left Over each month', a: fSav(A.savings), b: fSav(B.savings), win: better(A.savings, B.savings), hero: true },
 			{
 				key: 'months',
 				label: 'Time to save $10,000',
@@ -98,7 +86,7 @@
 				</tbody>
 			</table>
 			<p class="note">
-				Bold marks the stronger side where one is clearly better. Savings already subtracts taxes, rent and everyday
+				Bold marks the stronger side where one is clearly better. What’s Left Over already subtracts taxes, rent and everyday
 				costs, which is why it leads.
 			</p>
 		</div>

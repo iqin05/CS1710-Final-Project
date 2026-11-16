@@ -1,11 +1,11 @@
 <script>
 	import * as d3 from 'd3';
-	import { f$, fK, fPct, fSav, REGIONS } from '#lib/data.js';
+	import { f$, fK, fPct, fSav, REGIONS, leftOverRow, fLeftMonth } from '#lib/data.js';
 	import { axis, gridAxis } from '#lib/axis.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
-	// MAIN MESSAGE: compare cities by what you can save, not what you earn. Hero numbers for the two
-	// offer cities (each on its typical entry salary), then the salary-vs-savings scatter.
+	// MAIN MESSAGE visual: compare cities by what you can save, not what you earn. The salary-vs-
+	// savings scatter of all 40 metros; the words for this stage are in the story steps (story.js).
 	// mode, set by the story step:
 	//   'focus'   the two offers ringed and labeled, the gap between them drawn, other metros dimmed
 	//   'savings' the default chart (all 40 at full strength), with the offers ringed and labeled and
@@ -14,35 +14,17 @@
 	// Every point is the same size in every mode: size encodes nothing here.
 	let { data, offers, mode = 'focus' } = $props();
 
-	const ord = (n) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : Math.min(n % 10, 4) % 4] || 'th');
 	const corr = (xs, ys) => {
 		const mx = d3.mean(xs);
 		const my = d3.mean(ys);
 		const num = d3.sum(xs.map((x, i) => (x - mx) * (ys[i] - my)));
 		return num / Math.sqrt(d3.sum(xs.map((x) => (x - mx) ** 2)) * d3.sum(ys.map((y) => (y - my) ** 2)));
 	};
-	// Hero numbers for the two offer cities, each on its typical entry salary (the same basis as the
-	// scatter below).
+	// The two correlations quoted in the chart's subtitle: across the 40 metros, how closely entry
+	// salary tracks the cost of a modest budget, and how closely it tracks monthly savings.
 	let story = $derived.by(() => {
-		const rank = (key) => [...data.cities].sort((a, b) => b[key] - a[key]).map((c) => c.city);
-		const rS = rank('salary');
-		const rV = rank('savings');
-		const a = data.byCity[offers.A.city];
-		const b = data.byCity[offers.B.city];
-		const [hi, lo] = a.salary >= b.salary ? [a, b] : [b, a];
-		const text =
-			a === b
-				? `Both offers are in ${a.city}, so the comparison comes down to the salaries themselves.`
-				: hi.savings < lo.savings
-					? `A higher starting salary doesn't mean you'll keep more of it. ${hi.city} pays the ${ord(rS.indexOf(hi.city) + 1)}-highest typical entry salary of the 40 metros, ${fK(hi.salary - lo.salary)} more than ${lo.city}, yet ${lo.city} leaves about ${f$(lo.savings - hi.savings)} more every month.`
-					: `${hi.city} pays ${fK(hi.salary - lo.salary)} more a year than ${lo.city} and also leaves more, but only ${f$(hi.savings - lo.savings)} more a month: most of the difference in pay goes to the difference in cost.`;
 		const salaries = data.cities.map((c) => c.salary);
 		return {
-			text,
-			nums: [a, b].map((c) => [
-				[f$(c.salary), `${c.city} entry salary · ${ord(rS.indexOf(c.city) + 1)} of 40`],
-				[fSav(c.savings) + '/mo', `${c.city} saves · ${ord(rV.indexOf(c.city) + 1)} of 40`]
-			]).flat(),
 			rSav: corr(salaries, data.cities.map((c) => c.savings)),
 			rExp: corr(salaries, data.cities.map((c) => c.expenses))
 		};
@@ -107,8 +89,8 @@
 			dy1: ny < -0.6 ? '-1.45em' : '-0.3em',
 			pay: `${hi.city} pays ${fK(hi.salary - lo.salary)} more a year`,
 			keep: moreSave
-				? `${lo.city} saves ${f$(lo.savings - hi.savings)} more a month`
-				: `and saves ${f$(hi.savings - lo.savings)} more a month`
+				? `${lo.city} has ${f$(lo.savings - hi.savings)} more left over a month`
+				: `and has ${f$(hi.savings - lo.savings)} more left over a month`
 		};
 	});
 	const tip = (e, d) =>
@@ -117,7 +99,7 @@
 			meta: d.region,
 			rows: [
 				[f$(d.salary), 'entry salary'],
-				[f$(d.savings) + '/mo', 'est. savings'],
+				leftOverRow(d.savings),
 				[fPct(d.rentShare), 'rent share of take-home']
 			]
 		});
@@ -127,7 +109,7 @@
 		<div class="card">
 			<h3>A bigger paycheck does not mean more money left over</h3>
 			<p class="sub">
-				Across 40 metros, entry salary correlates {story.rExp.toFixed(2)} with the cost of a modest budget but only {story.rSav.toFixed(2)} with monthly savings. Blended across all fields; hover any dot.
+				Across 40 metros, entry salary correlates {story.rExp.toFixed(2)} with the cost of a modest budget but only {story.rSav.toFixed(2)} with what’s left over each month. Blended across all fields; hover any dot.
 			</p>
 			<div class="legend" aria-hidden="true">
 				{#each REGIONS as r (r)}
@@ -141,7 +123,7 @@
 					>your two offers
 				</span>
 			</div>
-			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of entry salary against estimated monthly savings for 40 metros, colored by region">
+			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of entry salary against what’s left over each month for 40 metros, colored by region">
 				<g class="axis" transform="translate(0,{H - M.b})" {@attach axis(xAxis)}></g>
 				<g class="axis" transform="translate({M.l},0)" {@attach axis(yAxis)}></g>
 				<text class="axis-label" x={(W + M.l) / 2} y={H - 6} text-anchor="middle"
@@ -151,7 +133,7 @@
 					class="axis-label ylab"
 					class:em={mode === 'savings'}
 					transform="translate(14,{(H - M.b + M.t) / 2}) rotate(-90)"
-					text-anchor="middle">estimated monthly savings</text
+					text-anchor="middle">What’s Left Over each month (est.)</text
 				>
 				<!-- Other metros: dimmed in 'focus', full strength otherwise. -->
 				{#each others as d (d.city)}
@@ -163,7 +145,7 @@
 						r="5"
 						fill={REGION_COLOR[d.region]}
 						role="img"
-						aria-label="{d.city} ({d.region}): {f$(d.salary)} salary, {fSav(d.savings)} a month saved"
+						aria-label="{d.city} ({d.region}): {f$(d.salary)} salary, {fLeftMonth(d.savings)}"
 						onpointermove={(e) => tip(e, d)}
 						onpointerleave={hideTip}
 					/>
@@ -188,7 +170,7 @@
 						r="5"
 						fill={REGION_COLOR[o.c.region]}
 						role="img"
-						aria-label="Offer {o.k}, {o.c.city} ({o.c.region}): {f$(o.c.salary)} salary, {fSav(o.c.savings)} a month saved"
+						aria-label="Offer {o.k}, {o.c.city} ({o.c.region}): {f$(o.c.salary)} salary, {fLeftMonth(o.c.savings)}"
 						onpointermove={(e) => tip(e, o.c)}
 						onpointerleave={hideTip}
 					/>

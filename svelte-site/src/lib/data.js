@@ -11,17 +11,37 @@ export const f$ = d3.format('$,.0f');
 export const fK = (v) => '$' + d3.format(',.1f')(v / 1000) + 'K';
 export const fPct = d3.format('.0%');
 export const fN = d3.format(',');
+
+// Time-to-save rule. Savings = take-home pay minus the monthly budget (excl. taxes). When expenses
+// meet or exceed take-home, savings is zero or negative, the goal can never be reached, and every
+// time-to-save output reads UNREACHABLE.
+export const GOAL = 10000;
+export const UNREACHABLE = 'Goal unreachable on current budget';
+/** Months to save `goal` at `savings` a month; Infinity when expenses meet or exceed take-home. */
+export const monthsToSave = (savings, goal = GOAL) => (savings > 0 ? goal / savings : Infinity);
+
 export const fMo = (m) =>
 	!isFinite(m)
-		? 'never'
+		? UNREACHABLE
 		: m <= 60
 			? d3.format('.1f')(m) + ' mo'
 			: m < 240
 				? d3.format('.1f')(m / 12) + ' yrs'
 				: d3.format(',.0f')(m / 12) + ' yrs';
 export const fJobs = (v) => (v >= 1e6 ? d3.format('.2s')(v) : d3.format('.0s')(v));
-// Signed money for savings, with a true minus sign: −$659/mo.
-export const fSav = (v) => (v < 0 ? '−' : '') + f$(Math.abs(v));
+// The primary metric, take-home pay minus the monthly budget, is shown to readers as "What’s Left
+// Over" (code still calls it `savings`).
+export const LEFT_OVER = 'What’s Left Over';
+/**
+ * A tooltip row for what's left over: [value, label]. A negative amount reads as money short each
+ * month rather than a bare minus sign.
+ */
+export const leftOverRow = (v, suffix = '') =>
+	v < 0 ? [f$(-v) + '/mo', 'short each month' + suffix] : [f$(v) + '/mo', 'left over each month' + suffix];
+// What's left over, in words instead of a minus sign: "$1,200", or "$659 short" for a deficit.
+export const fSav = (v) => (v < 0 ? f$(-v) + ' short' : f$(v));
+// The same as a phrase: "$1,200 a month left over" / "$659 a month short".
+export const fLeftMonth = (v) => (v < 0 ? `${f$(-v)} a month short` : `${f$(v)} a month left over`);
 
 const num = (v, nd = 0) => (nd ? +(+v).toFixed(nd) : Math.round(+v));
 
@@ -118,21 +138,32 @@ export function calc(data, city, salary) {
 		taxes,
 		take,
 		savings,
-		months: savings > 0 ? 10000 / savings : Infinity,
+		months: monthsToSave(savings),
 		rentShare: c.housing / take,
 		housing: c.housing,
 		rest: c.expenses - c.housing
 	};
 }
 
-/** Offer salaries move in $5,000 steps; offers start at the nearest step to the data's salary. */
+/** Size of one cash bundle on the title screen. */
 export const SALARY_STEP = 5000;
-export const roundSalary = (v) => Math.round(v / SALARY_STEP) * SALARY_STEP;
+/** The − / + buttons in the "Try other offers" step move a salary by this much. */
+export const SALARY_ADJUST = 1000;
 
-/** An offer in `city`/`field` at that metro's entry-level (25th-percentile) salary, rounded. */
-export function offerAt(data, city, field) {
+/**
+ * The locked baseline salary for an offer: the typical entry-level (25th-percentile) salary for that
+ * city and field. OEWS wages cover all workers, not just new hires, so the 25th percentile stands in
+ * for starting pay (close to NACE's class-of-2025 average). Uses all fields
+ * when the city has no data for the field. Offers vary only by location and industry.
+ */
+export function baselineSalary(data, city, field) {
 	const r = fieldRow(data, city, field) ?? fieldRow(data, city, ALL);
-	return { city, field, salary: roundSalary(r.salary) };
+	return r.salary;
+}
+
+/** An offer in `city`/`field` at its baseline (25th-percentile entry-level) salary. */
+export function offerAt(data, city, field) {
+	return { city, field, salary: baselineSalary(data, city, field) };
 }
 
 /**

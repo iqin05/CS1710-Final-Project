@@ -1,6 +1,6 @@
 <script>
 	import * as d3 from 'd3';
-	import { ALL, REGIONS, f$, fPct, fN, fMo, fJobs, fSav, fieldRow } from '#lib/data.js';
+	import { ALL, REGIONS, f$, fPct, fN, fMo, fJobs, fSav, fieldRow, monthsToSave, leftOverRow } from '#lib/data.js';
 	import { usMap } from '#lib/geo.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
@@ -117,7 +117,7 @@
 										rows: [
 											[fN(d.fjobs), 'entry-level jobs'],
 											[f$(d.fsal), '25th-pct salary'],
-											[fSav(d.fsav) + '/mo', 'est. savings']
+											leftOverRow(d.fsav)
 										]
 									})}
 								onpointerleave={hideTip}
@@ -152,8 +152,8 @@
 						[fN(selected.fjobs), 'entry-level jobs'],
 						[f$(selected.fsal), '25th-pct salary'],
 						[f$(Math.round(selected.fsal / (selected.rpp / 100))), 'salary, COL-adjusted'],
-						[fSav(selected.fsav) + '/mo', 'est. savings'],
-						[fMo(selected.fsav > 0 ? 10000 / selected.fsav : Infinity), 'to save $10k'],
+						leftOverRow(selected.fsav),
+						[fMo(monthsToSave(selected.fsav)), 'to save $10k'],
 						[f$(selected.rent1br), 'median 1-br rent'],
 						[selected.unemp.toFixed(1) + '%', "unemployment '25"],
 						[fPct(selected.young), 'residents age 20-29'],

@@ -288,13 +288,13 @@
 						{:else}
 							<p class="prose">Salary is only one part of the story. Also weigh:</p>
 							<ul class="factors">
-								<li>what you <strong>save</strong> after living expenses</li>
+								<li><strong>what’s left over</strong> after living expenses</li>
 								<li>the <strong>opportunities</strong> in your industry</li>
 								<li>the <strong>lifestyle</strong> you want</li>
 							</ul>
 							<h2>So, which city gives you the better start?</h2>
 							<p class="try">
-								<strong>Give it a go:</strong> change the field, city or salary in the offers below, or click any city
+								<strong>Give it a go:</strong> change the field or city in the offers below, or click any city
 								on the map to make it Offer A.
 							</p>
 						{/if}

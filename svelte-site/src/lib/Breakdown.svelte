@@ -19,7 +19,7 @@
 			['rest', r.rest, 'Food, transport, health, other'],
 			['tax', r.taxes, 'Taxes']
 		];
-		s.push(r.savings >= 0 ? ['left', r.savings, 'Left to save'] : ['short', -r.savings, 'Shortfall']);
+		s.push(r.savings >= 0 ? ['left', r.savings, 'Left over'] : ['short', -r.savings, 'Shortfall']);
 		return s;
 	}
 
@@ -27,6 +27,10 @@
 		const hi = A.salary >= B.salary ? A : B;
 		const lo = hi === A ? B : A;
 		const keep = A.savings >= B.savings ? A : B;
+		// Both offers in deficit: expenses exceed take-home in each, so neither reaches $10,000.
+		if (A.savings <= 0 && B.savings <= 0) {
+			return `Neither offer covers a modest budget: ${A.c.city} runs ${f$(-A.savings)} a month short and ${B.c.city} ${f$(-B.savings)}. Goal unreachable on current budget in both cities; it would take a higher salary or a smaller budget to save anything.`;
+		}
 		if (hi === keep) {
 			return `Here ${hi.c.city} wins on both counts: it pays ${f$(hi.salary - lo.salary)} more and keeps ${f$(hi.savings - lo.savings)} more a month. Still, ${Math.round((1 - hi.savings / (hi.salary / 12)) * 100)}% of the bigger paycheck is gone before you save a dollar.`;
 		}
@@ -44,7 +48,7 @@
 <div class="viz">
 		<div class="grid2">
 			{#each ['A', 'B'] as k}
-				<OfferEditor {data} key={k} offer={offers[k]} onchange={(patch) => setOffer(k, patch)} />
+				<OfferEditor {data} key={k} offer={offers[k]} editable onchange={(patch) => setOffer(k, patch)} />
 			{/each}
 		</div>
 		<div class="bd">
@@ -69,9 +73,11 @@
 						{/each}
 					</div>
 					<p class="left">
-						{r.savings < 0 ? '−' : ''}{f$(Math.abs(r.savings))} a month
+						{f$(Math.abs(r.savings))} a month{r.savings < 0 ? ' short' : ''}
 						<small>
-							{r.savings < 0 ? 'short of a modest budget' : `left to save · ${fMo(r.months)} to a $10,000 emergency fund`}
+							{isFinite(r.months)
+								? `left over · ${fMo(r.months)} to a $10,000 emergency fund`
+								: `${r.savings < 0 ? 'deficit: a modest budget costs more than take-home' : 'nothing left after a modest budget'} · ${fMo(r.months)}`}
 						</small>
 					</p>
 				</div>
@@ -81,12 +87,6 @@
 </div>
 
 <style>
-	section.story {
-		padding-top: 36px;
-	}
-	h2.small {
-		font-size: 24px;
-	}
 	.bd {
 		margin-top: 16px;
 	}

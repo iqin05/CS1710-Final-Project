@@ -1,6 +1,6 @@
 <script>
 	import * as d3 from 'd3';
-	import { ALL, REGIONS, f$, fN, fSav } from '#lib/data.js';
+	import { ALL, REGIONS, f$, fN, fSav, leftOverRow } from '#lib/data.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
 	// Field × city heatmap of monthly savings at each field's 25th-percentile entry salary.
@@ -45,7 +45,7 @@
 	let medians = $derived(
 		COLS.map((f) => {
 			const vs = cities.map((c) => val(c, f)).filter(shown).map((x) => x.v);
-			return vs.length ? f$(d3.median(vs)) : '–';
+			return vs.length ? fSav(d3.median(vs)) : '–';
 		})
 	);
 	let offerSet = $derived(new Set([offers.A.city, offers.B.city]));
@@ -69,7 +69,7 @@
 		<p class="beat">It depends on your field</p>
 		<h2>Your field matters more than your city</h2>
 		<p class="lede">
-			Each cell is what a graduate in that field could save each month in that metro at the 25th-percentile entry
+			Each cell is what a graduate in that field would have left over each month in that metro at the 25th-percentile entry
 			salary. The "All fields" column is the blended number a city ranking would show, and it hides a lot.
 		</p>
 		<div class="filters">
@@ -105,7 +105,7 @@
 				{/if}
 			</div>
 			<p>
-				In this view, switching fields moves your savings <strong>{d3.median(within) > across ? 'more' : 'less'}</strong>
+				In this view, switching fields moves what’s left over <strong>{d3.median(within) > across ? 'more' : 'less'}</strong>
 				than switching cities. Your two offer cities are highlighted in the table.
 			</p>
 		</div>
@@ -142,13 +142,13 @@
 											title: `${c.city} · ${f}`,
 											rows: x
 												? [
-														[fSav(x.v) + '/mo', 'est. savings at 25th-pct salary'],
+														leftOverRow(x.v, ' at 25th-pct salary'),
 														[fN(x.jobs), 'entry-level jobs']
 													]
 												: [],
 											note: x ? null : 'no occupations in this field here'
 										})}
-									onpointerleave={hideTip}>{shown(x) ? fSav(x.v) : '–'}</td
+									onpointerleave={hideTip}>{shown(x) ? f$(Math.abs(x.v)) : '–'}</td
 								>
 							{/each}
 						</tr>
@@ -157,9 +157,9 @@
 			</table>
 		</div>
 		<div class="legend-ramp">
-			<span>−$2,900</span><i></i><span>+$2,900</span>
+			<span>$2,900 short</span><i></i><span>$2,900 left over</span>
 			<span class="explain"
-				>Red cells lose money each month on a modest budget; blue cells save. Hatched = too few jobs or no data.</span
+				>Red cells are a monthly shortfall (the budget costs more than take-home); blue cells have money left over. Hatched = too few jobs or no data.</span
 			>
 		</div>
 	</div>

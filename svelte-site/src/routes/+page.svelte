@@ -18,7 +18,7 @@
 	import StepStory from '#lib/StepStory.svelte';
 	import TitleScreen from '#lib/TitleScreen.svelte';
 	import * as story from '#lib/story.js';
-	import { fSav } from '#lib/data.js';
+	import { f$ } from '#lib/data.js';
 
 	// Each stage is scrollytelling: text steps on the left, a pinned visual on the right (`vis`
 	// names the visual; a change cross-fades). Rising insights follow a new grad's train of thought:
@@ -57,17 +57,34 @@
 	let error = $state(null);
 
 	// The reader's two offers. Every section reads these; the hook and the final section edit them.
-	// Set from the data on load, before any section renders.
+	// Set from the data on load, before any section renders. Their salary is always the city × field
+	// typical entry-level (25th-percentile) pay, so the whole story runs on it.
 	let offers = $state(null);
 
-	// Changing an offer's city or field resets its salary to that city × field's entry-level pay.
+	// Salary overrides made in the final "Try other offers" step, the only place salary can change
+	// (null = use the typical salary). They never flow back into the story above.
+	let custom = $state({ A: null, B: null });
+	let tryOffers = $derived(
+		offers && {
+			A: { ...offers.A, salary: custom.A ?? offers.A.salary },
+			B: { ...offers.B, salary: custom.B ?? offers.B.salary }
+		}
+	);
+
+	// Changing an offer's city or field resets its salary to that city × field's typical entry-level pay.
 	function setOffer(key, patch) {
 		const o = { ...offers[key], ...patch };
-		offers[key] = (patch.city || patch.field) && patch.salary == null ? offerAt(data, o.city, o.field) : o;
+		offers[key] = offerAt(data, o.city, o.field);
+		custom[key] = null;
+	}
+	// The final step's editor: a salary change is kept as an override; city/field go to setOffer.
+	function setTryOffer(key, patch) {
+		if (patch.city || patch.field) setOffer(key, patch);
+		else if (patch.salary != null) custom[key] = patch.salary === offers[key].salary ? null : patch.salary;
 	}
 
 	// Two different cities, one field both have (skipping the thin catch-all fields),
-	// each at its local entry-level (25th-percentile) salary.
+	// each at its local typical entry-level salary for that field.
 	function randomize() {
 		const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 		const a = pick(data.cities).city;
@@ -77,9 +94,13 @@
 			data.fields.filter((f) => f !== 'Other' && f !== 'Office & Admin' && data.byField[a][f] && data.byField[b][f])
 		);
 		offers = { A: offerAt(data, a, field), B: offerAt(data, b, field) };
+		custom = { A: null, B: null };
 	}
 
-	const reset = () => (offers = defaultOffers(data));
+	function reset() {
+		offers = defaultOffers(data);
+		custom = { A: null, B: null };
+	}
 
 
 	onMount(async () => {
@@ -164,6 +185,7 @@
 					{' '}{c.mine.field} is #{c.mine.rank} of {c.mine.of}, at {c.mine.share}.{/if}
 			</p>
 		{/each}
+		<p>{story.nationalMix(data, offers)}</p>
 		<p>A city built around a few fields can be a great fit for those grads, and a thinner market for everyone else.</p>
 	{:else if s.key === 'rent'}
 		{@const r = story.rent(data, offers)}
@@ -191,16 +213,19 @@
 		</p>
 	{:else}
 		{@const v = story.savings(data, offers)}
-		<h2>Put it all together: what's left each month?</h2>
+		<h2>Put it all together: what’s left over each month?</h2>
 		<p>After taxes, rent, getting around and the rest of a modest budget, at your offers:</p>
 		{#each v as o (o.k)}
 			<div class="left {o.k.toLowerCase()}">
 				<span class="who">Offer {o.k} · {o.city} · {o.salary}/yr</span>
-				<b>{fSav(o.left)}<small>/mo</small></b>
-				<span>{isFinite(o.months) ? `${o.monthsTxt} to save $10,000` : 'never reaches $10,000'}</span>
+				<b>{f$(Math.abs(o.left))}<small>/mo {o.left < 0 ? 'short' : 'left over'}</small></b>
+				<span>{isFinite(o.months) ? `${o.monthsTxt} to save $10,000` : o.monthsTxt}</span>
 			</div>
 		{/each}
-		<p>Every metro is in the chart, on its typical entry salary. Change the field, region or goal to explore.</p>
+		<p>
+			The chart puts your two offers next to the nation's fastest and slowest metros, on their typical entry salaries.
+			Show all 40 to see where every metro lands, or change the field or goal to explore.
+		</p>
 	{/if}
 {/snippet}
 
@@ -223,7 +248,7 @@
 {#snippet messageText(s)}
 	{@const m = story.message(data, offers)}
 	{#if s.key === 'claim'}
-		<h2 class="claim">Recent graduates should compare cities by how much they can save, not just what they earn.</h2>
+		<h2 class="claim">Recent graduates should compare cities by what’s left over each month, not just what they earn.</h2>
 		<p>
 			{#if m.same}
 				Both offers are in {m.hi}, so the comparison comes down to the salaries themselves.
@@ -236,13 +261,13 @@
 			{/if}
 		</p>
 	{:else if s.key === 'why'}
-		<h2>Why savings?</h2>
+		<h2>Why “What’s Left Over”?</h2>
 		<p>
-			Savings is the honest number: it's what's left after <strong>everything</strong> comes out, from taxes and rent to
+			What’s Left Over is the honest number: it's what remains after <strong>everything</strong> comes out, from taxes and rent to
 			food, getting around, health care and other necessities. A salary is the number before any of that.
 		</p>
 		{#each m.ranks as r (r.city)}
-			<p><strong>{r.city}</strong>: {r.salary} salary ({r.sRank} of 40) → {r.save} a month saved ({r.vRank} of 40)</p>
+			<p><strong>{r.city}</strong>: {r.salary} salary ({r.sRank} of 40) → {r.save} a month left over ({r.vRank} of 40)</p>
 		{/each}
 	{:else}
 		<h2>The pattern holds across all 40 metros</h2>
@@ -274,10 +299,13 @@
 				The gap is cost, not pay.
 			{/if}
 		</p>
-		<p>Savings and time to $10,000 lead the table; everything else you weighed follows.</p>
+		<p>What’s Left Over and time to $10,000 lead the table; everything else you weighed follows.</p>
 	{:else}
 		<h2>Your turn: try other offers</h2>
-		<p>Change either offer's salary, city or field. Every number in the story updates, including these paycheck bars.</p>
+		<p>
+			Change either offer's city or field, or use − / + to try a salary other than the local typical one. These paycheck
+			bars update as you go; the story above stays on typical entry-level pay.
+		</p>
 	{/if}
 {/snippet}
 
@@ -285,7 +313,7 @@
 	{#if s.vis === 'table'}
 		<Compare {data} {offers} />
 	{:else}
-		<Breakdown {data} {offers} {setOffer} />
+		<Breakdown {data} offers={tryOffers} setOffer={setTryOffer} />
 	{/if}
 {/snippet}
 
@@ -297,7 +325,7 @@
 			Jobs and wages from BLS OEWS (May 2025), keeping the 132 occupations that typically require a bachelor's degree
 			and no experience. Population, rent and commutes from the Census ACS 2024. Price levels from BEA Regional Price
 			Parities. Unemployment from BLS LAUS (2025). "Entry-level salary" is the employment-weighted 25th-percentile wage
-			across those occupations. Savings = estimated take-home at that salary minus EPI's budget excluding taxes; the
+			across those occupations, computed for each city and field; OEWS covers all workers, not just new hires, so the 25th percentile stands in for starting pay. What’s Left Over = estimated take-home at that salary minus EPI's budget excluding taxes; the
 			budget assumes car ownership everywhere, so transit-heavy metros such as New York are likely understated.
 		</p>
 		<p>CS 1710 · Lorena Alvarez, Anna Feng, Ivy Qin</p>

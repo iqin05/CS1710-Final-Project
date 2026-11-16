@@ -34,12 +34,6 @@
 	let dots = $derived([...data.cities].sort((p, q) => (keyOf(p.city) ? 1 : 0) - (keyOf(q.city) ? 1 : 0)));
 
 	let chips = $derived(['A', 'B'].map((k) => ({ k, c: data.byCity[offers[k].city] })));
-	let insight = $derived.by(() => {
-		const [a, b] = chips.map((ch) => ch.c);
-		const [car, noCar] = carFree(a) >= carFree(b) ? [b, a] : [a, b];
-		const median = d3.median(data.cities, (d) => d.commute);
-		return `The average commute in ${a.city} is ${Math.round(a.commute)} minutes each way, against ${Math.round(b.commute)} in ${b.city} (typical metro: ${Math.round(median)}). In ${noCar.city}, ${fPct(carFree(noCar))} of workers get there by transit or on foot; in ${car.city}, ${fPct(car.driveAlone)} drive alone.`;
-	});
 </script>
 
 <div class="viz">
@@ -58,7 +52,7 @@
 		<div class="card">
 			<h3>Commute time vs. getting there without a car</h3>
 			<p class="sub">
-				Each dot is a metro. The budget behind our savings numbers assumes you own a car everywhere, so in metros near
+				Each dot is a metro. The budget behind our What’s Left Over numbers assumes you own a car everywhere, so in metros near
 				the top, going car-free could leave you more.
 			</p>
 			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of average commute time against share of car-free commuters for 40 metros">

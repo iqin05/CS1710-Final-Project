@@ -75,6 +75,54 @@ export function forEveryone(data, offers) {
 	});
 }
 
+/** A field in a city's top three at least this many times its national share is a regional standout. */
+const STANDOUT = 1.4;
+
+/**
+ * Step: are the offer cities' hiring mixes national patterns or regional anomalies? One sentence.
+ * The national leader is the field ranked #1 in the most metros; a standout is the field in a
+ * city's top three whose share of the city's entry-level jobs is furthest above its national share
+ * (all 40 metros pooled), when that is at least STANDOUT times.
+ */
+export function nationalMix(data, offers) {
+	const N = data.cities.length;
+	const shares = new Map(data.cities.map((c) => [c.city, fieldShares(data, c.city)]));
+	const total = d3.sum(data.cities, (c) => c.jobs);
+	const national = (f) => d3.sum(data.cities, (c) => data.byField[c.city]?.[f]?.jobs ?? 0) / total;
+	const leads = d3.rollup([...shares.values()], (v) => v.length, (rows) => rows[0].field);
+	const [leader, n] = [...leads].sort((p, q) => q[1] - p[1])[0];
+
+	const names = [...new Set([offers.A.city, offers.B.city])];
+	const info = names.map((city) => {
+		const top3 = shares.get(city).slice(0, 3);
+		const best = top3.map((r) => ({ ...r, ratio: r.share / national(r.field) })).sort((p, q) => q.ratio - p.ratio)[0];
+		// Where this city's share of that field ranks among all metros (1 = highest).
+		const rank = 1 + [...shares.values()].filter((rows) => (rows.find((r) => r.field === best.field)?.share ?? 0) > best.share).length;
+		return { city, leads: top3[0].field === leader, best, rank, standout: best.ratio >= STANDOUT };
+	});
+	const poss = (list) => list.map((d) => d.city + "'s").join(' and ');
+	const standouts = info.filter((d) => d.standout);
+	const usual = info.filter((d) => !d.standout);
+	const notLeading = info.filter((d) => !d.leads);
+
+	let s = `Nationally, ${leader} is the top new-grad field in ${n} of ${N} metros`;
+	s += notLeading.length ? `, though not in ${notLeading.map((d) => d.city).join(' or ')}` : ', so that lead is no local quirk';
+	if (!standouts.length) return `${s}, and the rest of ${poss(usual)} top fields track the national mix too.`;
+	s += `; the real regional ${standouts.length > 1 ? 'anomalies are' : 'anomaly is'} `;
+	// The first standout is spelled out; a second is kept short so the sentence stays readable.
+	const high = (d) => (d.rank === 1 ? 'highest' : ord(d.rank) + '-highest');
+	const x = (d) => d3.format('.1f')(d.best.ratio) + '×';
+	s += standouts
+		.map((d, i) =>
+			i === 0
+				? `${d.city}'s ${d.best.field}, at ${x(d)} its national share (${high(d)} of ${N} metros)`
+				: `${d.city}'s ${d.best.field} (${x(d)}, ${high(d)})`
+		)
+		.join(' and ');
+	if (usual.length) s += `, while ${poss(usual)} top fields track the national mix`;
+	return s + '.';
+}
+
 /** Step: where will I live? */
 export function rent(data, offers) {
 	const ms = ['A', 'B'].map((k) => calc(data, offers[k].city, offers[k].salary));

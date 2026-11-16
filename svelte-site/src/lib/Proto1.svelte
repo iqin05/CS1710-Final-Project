@@ -1,6 +1,6 @@
 <script>
 	import * as d3 from 'd3';
-	import { ALL, f$, fPct, fN, fMo, fJobs, fSav, fieldRow } from '#lib/data.js';
+	import { ALL, f$, fN, fJobs, fSav, fieldRow, leftOverRow } from '#lib/data.js';
 	import { axis, gridAxis } from '#lib/axis.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
@@ -66,7 +66,6 @@
 	let dots = $derived(
 		[...rows].sort((a, b) => (a.city === sel || marks.has(a.city)) - (b.city === sel || marks.has(b.city)))
 	);
-	let selected = $derived(rows.find((r) => r.city === sel));
 
 	function tipFor(e, d) {
 		showTip(e, {
@@ -76,7 +75,7 @@
 				[fN(d.fjobs), 'entry-level jobs'],
 				[d3.format('.0f')(d.per), 'per 1,000 local jobs'],
 				[f$(d.fsal), '25th-pct salary'],
-				[fSav(d.fsav) + '/mo', 'est. savings']
+				leftOverRow(d.fsav)
 			]
 		});
 	}

@@ -45,25 +45,6 @@
 			return { k, o, c: m.c, rent: m.housing, share: m.rentShare, rank: byRent.indexOf(o.city) + 1 };
 		})
 	);
-	// Does rent take a bigger share where rent is higher? (Correlation across the 40 metros.)
-	let rentVsShare = $derived.by(() => {
-		const xs = data.cities.map((d) => d.housing);
-		const ys = data.cities.map((d) => d.rentShare);
-		const mx = d3.mean(xs);
-		const my = d3.mean(ys);
-		const num = d3.sum(xs.map((v, i) => (v - mx) * (ys[i] - my)));
-		return num / Math.sqrt(d3.sum(xs.map((v) => (v - mx) ** 2)) * d3.sum(ys.map((v) => (v - my) ** 2)));
-	});
-	let insight = $derived.by(() => {
-		const [a, b] = chips;
-		const [hi, lo] = a.rent >= b.rent ? [a, b] : [b, a];
-		const median = d3.median(data.cities, (d) => d.housing);
-		const pattern =
-			rentVsShare > 0.3
-				? ' Salaries are higher where rent is higher, but not by enough: across the 40 metros, the pricier the rent, the bigger the bite it takes from the paycheck.'
-				: '';
-		return `A studio in ${hi.c.city} rents for ${f$(hi.rent)} a month, ${f$(hi.rent - lo.rent)} more than in ${lo.c.city} (${f$(lo.rent)}); the typical metro is ${f$(median)}.${pattern}`;
-	});
 </script>
 
 <div class="viz">

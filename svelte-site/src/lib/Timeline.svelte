@@ -1,12 +1,15 @@
 <script>
 	import * as d3 from 'd3';
-	import { ALL, f$, fK, fPct, fMo, fSav } from '#lib/data.js';
+	import { ALL, f$, fK, fPct, fMo, fSav, monthsToSave, UNREACHABLE, leftOverRow } from '#lib/data.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
 	// RISING INSIGHTS 5, the main insight: what's left each month, and how long to a savings goal.
 	// One lane per metro; the two offer cities' lanes are highlighted, and the cards above give each
 	// offer's own numbers at its offered salary. Changing the field or region "races" every marker
 	// from the start line; moving the goal slider glides them to their new spots.
+	// By default only four lanes show: the two offer cities and the national benchmarks (the fastest
+	// and slowest metros in the selected field), so readers aren't hit with 40 rows at once. A toggle
+	// expands to every metro and unlocks the region filter.
 	// laneH: row height, so all 40 metros fit the pinned panel (the page sizes it to the screen).
 	let { data, offers, laneH = 22 } = $props();
 
@@ -15,22 +18,28 @@
 	const REGIONS = ['All regions', 'Northeast', 'Midwest', 'South', 'West'];
 	const M = { top: 26, right: 118, bottom: 6, left: 148 };
 	const DIV = 34;
+	const FOCUS_LANE = 40; // taller lanes in the four-lane view, with room for a benchmark label
 	const RACE_MS = 1500;
 
 	let field = $derived(offers.A.field);
 	let region = $state('All regions');
 	let goal = $state(10000);
 	let tableView = $state(false);
+	let showAll = $state(false);
 	let chartW = $state(0);
 
 	// ---------- data ----------
-	let rows = $derived.by(() => {
+	// The region filter applies only in the all-metros view; benchmarks are always national.
+	let activeRegion = $derived(showAll ? region : 'All regions');
+	// Every metro in the field (and region), sorted. `rows` below is what the chart draws.
+	let all = $derived.by(() => {
 		const out = [];
 		for (const c of data.cities) {
 			const f = field === ALL ? { salary: c.salary, take: c.take, savings: c.savings, jobs: c.jobs } : data.byField[c.city]?.[field];
 			if (!f) continue;
-			if (region !== 'All regions' && c.region !== region) continue;
-			out.push({ ...c, ...f, months: f.savings > 0 ? goal / f.savings : Infinity });
+			if (activeRegion !== 'All regions' && c.region !== activeRegion) continue;
+			// Field rows carry their own salary and take-home, so rent share is recomputed from them.
+			out.push({ ...c, ...f, rentShare: c.housing / f.take, months: monthsToSave(f.savings, goal) });
 		}
 		// Fastest first; metros that never get there go last, least-bad shortfall first.
 		return out.sort((a, b) =>
@@ -43,12 +52,25 @@
 						: b.savings - a.savings
 		);
 	});
+	// National benchmarks: first and last of the sorted list (fastest; slowest or worst shortfall).
+	let best = $derived(all[0]?.city);
+	let worst = $derived(all[all.length - 1]?.city);
+	const benchKey = (city) => (city === best ? 'best' : city === worst ? 'worst' : '');
+	let rows = $derived(showAll ? all : all.filter((d) => offerKey(d.city) || d.city === best || d.city === worst));
 	let finite = $derived(rows.filter((d) => isFinite(d.months)));
 	let never = $derived(rows.filter((d) => !isFinite(d.months)));
+	let allFinite = $derived(all.filter((d) => isFinite(d.months)));
+	let allNever = $derived(all.filter((d) => !isFinite(d.months)));
 	let missing = $derived(
 		field === ALL
 			? 0
-			: data.cities.filter((c) => (region === 'All regions' || c.region === region) && !data.byField[c.city]?.[field]).length
+			: data.cities.filter(
+					(c) => (activeRegion === 'All regions' || c.region === activeRegion) && !data.byField[c.city]?.[field]
+				).length
+	);
+	// Offer cities with no data in this field have no lane; the four-lane view says so.
+	let absent = $derived(
+		[offers.A.city, offers.B.city].filter((c, i, arr) => arr.indexOf(c) === i && !all.some((d) => d.city === c))
 	);
 
 	// ---------- layout ----------
@@ -61,7 +83,7 @@
 	let x = $derived(d3.scaleLinear().domain([0, cap]).range([0, innerW]));
 	let ticks = $derived(d3.range(0, cap + 0.1, cap <= 12 ? 3 : cap <= 24 ? 6 : 12));
 	let showDivider = $derived(never.length > 0 && finite.length > 0);
-	let LANE = $derived(laneH);
+	let LANE = $derived(showAll ? laneH : FOCUS_LANE);
 	let height = $derived(M.top + rows.length * LANE + (showDivider ? DIV : 0) + M.bottom);
 	let divY = $derived(M.top + finite.length * LANE);
 	let yOf = $derived(
@@ -78,7 +100,8 @@
 	let mode = $state('race');
 	$effect(() => {
 		field;
-		region; // re-race whenever the field or region changes
+		region;
+		showAll; // re-race whenever the field, region or view changes
 		mode = 'race';
 		phase = 'start';
 		let id2;
@@ -104,23 +127,23 @@
 
 	// ---------- text ----------
 	let insight = $derived.by(() => {
-		if (!finite.length) return [['On a typical entry salary in this field, no metro shown here clears the monthly budget.', false]];
-		const fast = finite[0];
-		const slow = finite[finite.length - 1];
+		if (!allFinite.length) return [['On a typical entry salary in this field, no metro clears the monthly budget.', false]];
+		const fast = allFinite[0];
+		const slow = allFinite[allFinite.length - 1];
 		const fieldTxt = field === ALL ? 'entry-level salary' : `entry-level ${field} salary`;
 		const parts = [
 			[`On a typical ${fieldTxt}, `, false],
 			[`${fast.city} (${fK(fast.salary)})`, true],
 			[` gets to ${f$(goal)} in ${fMo(fast.months)}`, false]
 		];
-		if (finite.length > 1) parts.push(['; ', false], [`${slow.city} (${fK(slow.salary)})`, true], [` takes ${fMo(slow.months)}`, false]);
+		if (allFinite.length > 1) parts.push(['; ', false], [`${slow.city} (${fK(slow.salary)})`, true], [` takes ${fMo(slow.months)}`, false]);
 		parts.push(['. ', false]);
-		if (never.length)
-			parts.push([`${never.length} metro${never.length === 1 ? '' : 's'} never get there because the budget exceeds take-home. `, false]);
+		if (allNever.length)
+			parts.push([`${allNever.length} metro${allNever.length === 1 ? '' : 's'} never get there because the budget exceeds take-home. `, false]);
 		// The two offer cities, on the same typical salaries as the lanes: the higher-paying one first.
 		// Skipped when either is outside the current field/region view, or both pay the same.
-		const a = rows.find((d) => d.city === offers.A.city);
-		const b = rows.find((d) => d.city === offers.B.city);
+		const a = all.find((d) => d.city === offers.A.city);
+		const b = all.find((d) => d.city === offers.B.city);
 		if (a && b && a !== b && a.salary !== b.salary) {
 			const [hi, lo] = a.salary > b.salary ? [a, b] : [b, a];
 			const x = (p, q) => d3.format('.1f')(p / q) + '×';
@@ -138,7 +161,12 @@
 		return parts;
 	});
 	let note = $derived(
-		`${rows.length} metro${rows.length === 1 ? '' : 's'} · goal ${f$(goal)}` + (missing ? ` · ${missing} without ${field} data` : '')
+		(showAll
+			? `${rows.length} metro${rows.length === 1 ? '' : 's'}`
+			: `Your offers vs. the fastest and slowest of ${all.length} metros`) +
+			` · goal ${f$(goal)}` +
+			(missing ? ` · ${missing} without ${field} data` : '') +
+			(!showAll && absent.length ? ` · ${absent.join(' and ')} not shown (no ${field} data)` : '')
 	);
 
 	// ---------- interaction ----------
@@ -146,12 +174,12 @@
 		showTip(e, {
 			title: `${d.city}, ${d.state}`,
 			meta: `${d.region} · ${field === ALL ? 'all fields' : field}`,
-			big: isFinite(d.months) ? `${fMo(d.months)} to ${f$(goal)}` : `never reaches ${f$(goal)}`,
+			big: isFinite(d.months) ? `${fMo(d.months)} to ${f$(goal)}` : UNREACHABLE,
 			rows: [
 				[f$(d.salary), 'entry salary (25th pct)'],
 				[f$(d.take) + '/mo', 'est. take-home'],
-				['−' + f$(d.expenses) + '/mo', 'budget excl. taxes'],
-				[fSav(d.savings) + '/mo', d.savings < 0 ? 'shortfall' : 'left to save'],
+				[f$(d.expenses) + '/mo', 'budget excl. taxes'],
+				leftOverRow(d.savings),
 				[fPct(d.rentShare), 'rent share of take-home']
 			]
 		});
@@ -173,11 +201,16 @@
 					{#each [ALL, ...data.fields] as f (f)}<option value={f}>{f}</option>{/each}
 				</select>
 			</label>
-			<div class="seg" role="group" aria-label="Region">
-				{#each REGIONS as r (r)}
-					<button type="button" aria-pressed={r === region} onclick={() => (region = r)}>{r}</button>
-				{/each}
-			</div>
+			<button class="ghost" aria-pressed={showAll} onclick={() => (showAll = !showAll)}
+				>{showAll ? 'Show my offers only' : `Show all ${data.cities.length} metros`}</button
+			>
+			{#if showAll}
+				<div class="seg" role="group" aria-label="Region">
+					{#each REGIONS as r (r)}
+						<button type="button" aria-pressed={r === region} onclick={() => (region = r)}>{r}</button>
+					{/each}
+				</div>
+			{/if}
 			<label class="goal">
 				Goal
 				<input
@@ -201,14 +234,17 @@
 		</p>
 		<section class="card">
 			<div class="title-row">
-				<h3>Months to reach the goal</h3>
+				<h3>Months to save {f$(goal)} from What’s Left Over</h3>
 				<span class="sub">{note}</span>
 			</div>
 			<div class="legend" aria-hidden="true">
 				<span><i></i>metro, typical entry salary in the selected field</span>
 				<span><i class="oa"></i>{offers.A.city} (Offer A)</span>
 				<span><i class="ob"></i>{offers.B.city} (Offer B)</span>
-				<span><i class="never"></i>never: budget exceeds take-home</span>
+				{#if !showAll}
+					<span><i class="bench"></i>national benchmark: fastest and slowest metro</span>
+				{/if}
+				<span><i class="never"></i>unreachable: budget exceeds take-home</span>
 			</div>
 			<div bind:clientWidth={chartW} hidden={tableView}>
 				{#if rows.length}
@@ -217,7 +253,7 @@
 						{width}
 						{height}
 						role="img"
-						aria-label="Sorted lanes of metros with a marker at the month each reaches the savings goal"
+						aria-label="Sorted lanes of metros with a marker at the month each saves {f$(goal)} from what’s left over"
 					>
 						<g class="grid">
 							{#each ticks as t (t)}
@@ -232,19 +268,31 @@
 							<g
 								class="lane {offerKey(d.city) ? 'offer offer-' + offerKey(d.city) : ''}"
 								class:never={!isFinite(d.months)}
+								class:bench={!showAll && benchKey(d.city) && !offerKey(d.city)}
 								style:transform="translate(0px, {yOf.get(d.city)}px)"
 								tabindex="0"
 								role="img"
-								aria-label="{d.city}, {d.state}: {fMo(d.months)}"
+								aria-label="{d.city}, {d.state}{!showAll && benchKey(d.city)
+									? `, national ${benchKey(d.city) === 'best' ? 'fastest' : 'slowest'} of ${all.length}`
+									: ''}: {fMo(d.months)}"
 								onpointermove={(e) => laneTip(e, d)}
 								onpointerleave={hideTip}
 								onfocus={(e) => focusTip(e, d)}
 								onblur={hideTip}
 							>
 								<rect class="hit" {width} height={LANE} rx="4" />
-								<text class="name" x={M.left - 10} y={LANE / 2} dy="0.34em" text-anchor="end"
-									>{d.city}<tspan class="st">{' ' + d.state}</tspan></text
+								<text
+									class="name"
+									x={M.left - 10}
+									y={LANE / 2 - (!showAll && benchKey(d.city) ? 6 : 0)}
+									dy="0.34em"
+									text-anchor="end">{d.city}<tspan class="st">{' ' + d.state}</tspan></text
 								>
+								{#if !showAll && benchKey(d.city)}
+									<text class="tag" x={M.left - 10} y={LANE / 2 + 9} dy="0.34em" text-anchor="end"
+										>{benchKey(d.city) === 'best' ? 'fastest' : 'slowest'} of {all.length}</text
+									>
+								{/if}
 								<rect
 									class="stem"
 									x={M.left}
@@ -273,7 +321,7 @@
 									style:transition={valStyle(d)}
 									>{isFinite(d.months)
 										? fMo(d.months) + (d.months > cap ? ' ›' : '')
-										: `never · −${f$(-d.savings)}/mo`}</text
+										: `unreachable · ${f$(-d.savings)}/mo short`}</text
 								>
 							</g>
 						{/each}
@@ -281,7 +329,7 @@
 							<g class="divider" transform="translate(0,{divY + DIV / 2})">
 								<line x1={M.left} x2={M.left + innerW} y1={-DIV / 2 + 4} y2={-DIV / 2 + 4} />
 								<text x={M.left} dy="0.32em"
-									>Budget exceeds take-home at this salary: the goal is never reached ({never.length} metro{never.length === 1
+									>Budget exceeds take-home at this salary: goal unreachable on current budget ({never.length} metro{never.length === 1
 										? ''
 										: 's'})</text
 								>
@@ -294,10 +342,10 @@
 			</div>
 			{#if tableView}
 				<table>
-					<caption>Months to save {f$(goal)} on a typical entry salary, {field === ALL ? 'all fields' : field}</caption>
+					<caption>Months to save {f$(goal)} from What’s Left Over on a typical entry salary, {field === ALL ? 'all fields' : field}</caption>
 					<thead>
 						<tr>
-							{#each ['Metro', 'Region', 'Entry salary', 'Take-home / mo', 'Budget / mo', 'Savings / mo', 'Months to goal'] as h}
+							{#each ['Metro', 'Region', 'Entry salary', 'Take-home / mo', 'Budget / mo', 'Left over / mo', 'Months to save goal'] as h}
 								<th scope="col">{h}</th>
 							{/each}
 						</tr>
@@ -311,7 +359,7 @@
 								<td>{f$(d.take)}</td>
 								<td>{f$(d.expenses)}</td>
 								<td>{fSav(d.savings)}</td>
-								<td>{isFinite(d.months) ? d3.format('.1f')(d.months) : 'never'}</td>
+								<td>{isFinite(d.months) ? d3.format('.1f')(d.months) : UNREACHABLE}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -376,6 +424,9 @@
 	.legend i.ob {
 		background: var(--b);
 	}
+	.legend i.bench {
+		background: var(--ink-2);
+	}
 	.legend i.never {
 		background: transparent;
 		border: 2px solid var(--muted);
@@ -417,6 +468,16 @@
 		fill: var(--muted);
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
+	}
+	.lane .tag {
+		fill: var(--muted);
+		font-size: 10px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.lane.bench .stem,
+	.lane.bench .dot {
+		fill: var(--ink-2);
 	}
 	.lane .stem {
 		fill: var(--series);

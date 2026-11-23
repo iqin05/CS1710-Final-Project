@@ -56,57 +56,31 @@
 	let data = $state(null);
 	let error = $state(null);
 
-	// The reader's two offers. Every section reads these; the hook and the final section edit them.
-	// Set from the data on load, before any section renders. Their salary is always the city × field
-	// typical entry-level (25th-percentile) pay, so the whole story runs on it.
+	// The story's two offers: the same for every reader, New York vs. Detroit across all entry-level
+	// fields, each at its typical entry-level (25th-percentile) salary. Set once on load and never
+	// changed, so every section from the hook to the comparison table tells the same story.
 	let offers = $state(null);
 
-	// Salary overrides made in the final "Try other offers" step, the only place salary can change
-	// (null = use the typical salary). They never flow back into the story above.
-	let custom = $state({ A: null, B: null });
-	let tryOffers = $derived(
-		offers && {
-			A: { ...offers.A, salary: custom.A ?? offers.A.salary },
-			B: { ...offers.B, salary: custom.B ?? offers.B.salary }
-		}
-	);
+	// The final "Try other offers" step has its own copy, the only place a reader can change a city,
+	// field or salary. It starts at the story's offers and never flows back into the story above.
+	let tryOffers = $state(null);
 
-	// Changing an offer's city or field resets its salary to that city × field's typical entry-level pay.
-	function setOffer(key, patch) {
-		const o = { ...offers[key], ...patch };
-		offers[key] = offerAt(data, o.city, o.field);
-		custom[key] = null;
-	}
-	// The final step's editor: a salary change is kept as an override; city/field go to setOffer.
+	// Changing a city or field resets that offer's salary to the new typical pay; a salary change
+	// is kept as an override.
 	function setTryOffer(key, patch) {
-		if (patch.city || patch.field) setOffer(key, patch);
-		else if (patch.salary != null) custom[key] = patch.salary === offers[key].salary ? null : patch.salary;
+		if (patch.city || patch.field) {
+			const o = { ...tryOffers[key], ...patch };
+			tryOffers[key] = offerAt(data, o.city, o.field);
+		} else if (patch.salary != null) {
+			tryOffers[key] = { ...tryOffers[key], salary: patch.salary };
+		}
 	}
-
-	// Two different cities, one field both have (skipping the thin catch-all fields),
-	// each at its local typical entry-level salary for that field.
-	function randomize() {
-		const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-		const a = pick(data.cities).city;
-		let b = pick(data.cities).city;
-		while (b === a) b = pick(data.cities).city;
-		const field = pick(
-			data.fields.filter((f) => f !== 'Other' && f !== 'Office & Admin' && data.byField[a][f] && data.byField[b][f])
-		);
-		offers = { A: offerAt(data, a, field), B: offerAt(data, b, field) };
-		custom = { A: null, B: null };
-	}
-
-	function reset() {
-		offers = defaultOffers(data);
-		custom = { A: null, B: null };
-	}
-
 
 	onMount(async () => {
 		try {
 			const d = await loadData();
 			offers = defaultOffers(d);
+			tryOffers = defaultOffers(d);
 			data = d;
 		} catch (e) {
 			error = e.message;
@@ -135,7 +109,7 @@
 	<Scrolly steps={BEATS}>
 		{#snippet scene(beat)}
 			{#if beat.id === 'hook'}
-				<Hook {data} {offers} {setOffer} onrandomize={randomize} onreset={reset} />
+				<Hook {data} {offers} />
 			{:else if beat.id === 'rising'}
 				<StepStory id="rising" steps={RISING} text={risingText} graphic={risingVis} />
 			{:else if beat.id === 'message'}
@@ -163,9 +137,6 @@
 				? `, about ${j.ratio}× as many in ${j.more}`
 				: ''}.
 		</p>
-		{#if !j.named}
-			<p>Your offers don't name a field yet. Pick yours in the menu to see your own job market.</p>
-		{/if}
 	{:else if s.key === 'pay'}
 		{@const p = story.payVsJobs(data, offers)}
 		{@const what = p.label === 'any field' ? 'entry-level' : p.label}
@@ -224,7 +195,7 @@
 		{/each}
 		<p>
 			The chart puts your two offers next to the nation's fastest and slowest metros, on their typical entry salaries.
-			Show all 40 to see where every metro lands, or change the field or goal to explore.
+			Show all 40 to see where every metro lands, or change the industry or goal to explore.
 		</p>
 	{/if}
 {/snippet}
@@ -303,8 +274,8 @@
 	{:else}
 		<h2>Your turn: try other offers</h2>
 		<p>
-			Change either offer's city or field, or use − / + to try a salary other than the local typical one. These paycheck
-			bars update as you go; the story above stays on typical entry-level pay.
+			Now it's your offers. Change either city or field, or use − / + to try a salary other than the local typical one.
+			These paycheck bars update as you go; the story above stays on New York vs. Detroit.
 		</p>
 	{/if}
 {/snippet}

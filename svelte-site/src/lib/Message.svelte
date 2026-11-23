@@ -1,6 +1,6 @@
 <script>
 	import * as d3 from 'd3';
-	import { f$, fK, fPct, fSav, REGIONS, leftOverRow, fLeftMonth } from '#lib/data.js';
+	import { ALL, f$, fK, fPct, fSav, REGIONS, leftOverRow, fLeftMonth, metrosInField } from '#lib/data.js';
 	import { axis, gridAxis } from '#lib/axis.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
@@ -14,6 +14,12 @@
 	// Every point is the same size in every mode: size encodes nothing here.
 	let { data, offers, mode = 'focus' } = $props();
 
+	// Every metro on its typical entry-level (25th-percentile) salary in the offers' field, so the
+	// two offers sit at exactly the salaries the rest of the story uses.
+	let field = $derived(offers.A.field);
+	let metros = $derived(metrosInField(data, field));
+	const fieldLabel = (f) => (f === ALL ? 'all fields' : f);
+
 	const corr = (xs, ys) => {
 		const mx = d3.mean(xs);
 		const my = d3.mean(ys);
@@ -23,31 +29,49 @@
 	// The two correlations quoted in the chart's subtitle: across the 40 metros, how closely entry
 	// salary tracks the cost of a modest budget, and how closely it tracks monthly savings.
 	let story = $derived.by(() => {
-		const salaries = data.cities.map((c) => c.salary);
+		const salaries = metros.map((c) => c.salary);
 		return {
-			rSav: corr(salaries, data.cities.map((c) => c.savings)),
-			rExp: corr(salaries, data.cities.map((c) => c.expenses))
+			rSav: corr(salaries, metros.map((c) => c.savings)),
+			rExp: corr(salaries, metros.map((c) => c.expenses))
 		};
 	});
 
 	const W = 900;
 	const H = 420;
 	const M = { l: 60, r: 20, t: 14, b: 40 };
-	const x = d3.scaleLinear().domain([58000, 132000]).range([M.l, W - M.r]);
-	const y = d3.scaleLinear().domain([0, 2400]).range([H - M.b, M.t]);
-	const xAxis = gridAxis(
+	// Domains fit the field's metros; the savings axis always includes $0, so a shortfall reads as
+	// below the line.
+	let x = $derived(
 		d3
-			.axisBottom(x)
-			.ticks(8)
-			.tickFormat((v) => '$' + v / 1000 + 'k'),
-		H - M.b - M.t
+			.scaleLinear()
+			.domain(d3.extent(metros, (d) => d.salary))
+			.nice()
+			.range([M.l, W - M.r])
 	);
-	const yAxis = gridAxis(
+	let y = $derived(
 		d3
-			.axisLeft(y)
-			.ticks(6)
-			.tickFormat((v) => '$' + d3.format(',')(v)),
-		W - M.l - M.r
+			.scaleLinear()
+			.domain([Math.min(0, d3.min(metros, (d) => d.savings)), d3.max(metros, (d) => d.savings)])
+			.nice()
+			.range([H - M.b, M.t])
+	);
+	let xAxis = $derived(
+		gridAxis(
+			d3
+				.axisBottom(x)
+				.ticks(8)
+				.tickFormat((v) => '$' + v / 1000 + 'k'),
+			H - M.b - M.t
+		)
+	);
+	let yAxis = $derived(
+		gridAxis(
+			d3
+				.axisLeft(y)
+				.ticks(6)
+				.tickFormat((v) => (v < 0 ? '−$' : '$') + d3.format(',')(Math.abs(v))),
+			W - M.l - M.r
+		)
 	);
 	// Region is color alone (rose, green, amber, blue), every metro a plain circle. The four hues
 	// share one chroma (OKLCH C 0.14) and lightness within 0.02 (L 0.60–0.62, hues 330/160/60/260),
@@ -62,9 +86,11 @@
 	// The two offer cities stand out (full color, larger, ringed, labeled); every other metro is dimmed
 	// for context. A dashed line joins the two offers, labeled with the gap in pay and in savings.
 	let offerSet = $derived(new Set([offers.A.city, offers.B.city]));
-	let others = $derived(data.cities.filter((d) => !offerSet.has(d.city)));
+	let others = $derived(metros.filter((d) => !offerSet.has(d.city)));
 	let offerPts = $derived(
-		['A', 'B'].map((k) => ({ k, c: data.byCity[offers[k].city] })).filter((o, i, arr) => arr.findIndex((p) => p.c === o.c) === i)
+		['A', 'B']
+			.map((k) => ({ k, c: metros.find((d) => d.city === offers[k].city) }))
+			.filter((o, i, arr) => o.c && arr.findIndex((p) => p.c === o.c) === i)
 	);
 	let gap = $derived.by(() => {
 		if (offerPts.length < 2) return null;
@@ -109,7 +135,7 @@
 		<div class="card">
 			<h3>A bigger paycheck does not mean more money left over</h3>
 			<p class="sub">
-				Across 40 metros, entry salary correlates {story.rExp.toFixed(2)} with the cost of a modest budget but only {story.rSav.toFixed(2)} with what’s left over each month. Blended across all fields; hover any dot.
+				Across {metros.length} metros, entry salary in {fieldLabel(field)} correlates {story.rExp.toFixed(2)} with the cost of a modest budget but only {story.rSav.toFixed(2)} with what’s left over each month. Hover any dot.
 			</p>
 			<div class="legend" aria-hidden="true">
 				{#each REGIONS as r (r)}
@@ -123,11 +149,11 @@
 					>your two offers
 				</span>
 			</div>
-			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of entry salary against what’s left over each month for 40 metros, colored by region">
+			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of {fieldLabel(field)} entry salary against what’s left over each month for {metros.length} metros, colored by region">
 				<g class="axis" transform="translate(0,{H - M.b})" {@attach axis(xAxis)}></g>
 				<g class="axis" transform="translate({M.l},0)" {@attach axis(yAxis)}></g>
 				<text class="axis-label" x={(W + M.l) / 2} y={H - 6} text-anchor="middle"
-					>typical entry-level salary (25th percentile, all fields)</text
+					>typical entry-level salary (25th percentile, {fieldLabel(field)})</text
 				>
 				<text
 					class="axis-label ylab"

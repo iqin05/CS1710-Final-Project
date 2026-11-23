@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { ALL, f$, fK, fN, fPct, fMo, calc, fieldRow, fieldShares } from '#lib/data.js';
+import { ALL, f$, fK, fN, fPct, fMo, calc, fieldRow, fieldShares, metrosInField } from '#lib/data.js';
 
 // The words of the scrollytelling steps, computed from the data and the reader's two offers so the
 // narrative follows whatever offers they set. Each function returns plain strings; the page lays
@@ -128,7 +128,9 @@ export function rent(data, offers) {
 	const ms = ['A', 'B'].map((k) => calc(data, offers[k].city, offers[k].salary));
 	const [hi, lo] = ms[0].housing >= ms[1].housing ? ms : [ms[1], ms[0]];
 	const xs = data.cities.map((d) => d.housing);
-	const r = corr(xs, data.cities.map((d) => d.rentShare));
+	// Rent share on each metro's typical salary in the offers' field.
+	const metros = metrosInField(data, offers.A.field);
+	const r = corr(metros.map((d) => d.housing), metros.map((d) => d.rentShare));
 	return {
 		hi: hi.c.city,
 		lo: lo.c.city,
@@ -168,14 +170,15 @@ export function savings(data, offers) {
 	});
 }
 
-/** Main message: the two offer cities on their typical entry salaries, among all 40. */
+/** Main message: the two offer cities among all the metros, every one on its typical entry salary in the offers' field. */
 export function message(data, offers) {
-	const rank = (key) => [...data.cities].sort((p, q) => q[key] - p[key]).map((c) => c.city);
+	const metros = metrosInField(data, offers.A.field);
+	const rank = (key) => [...metros].sort((p, q) => q[key] - p[key]).map((c) => c.city);
 	const rS = rank('salary');
 	const rV = rank('savings');
-	const [a, b] = cities(data, offers);
+	const [a, b] = [offers.A.city, offers.B.city].map((city) => metros.find((c) => c.city === city));
 	const [hi, lo] = a.salary >= b.salary ? [a, b] : [b, a];
-	const salaries = data.cities.map((c) => c.salary);
+	const salaries = metros.map((c) => c.salary);
 	return {
 		same: a === b,
 		hi: hi.city,
@@ -185,8 +188,9 @@ export function message(data, offers) {
 		keepGap: f$(Math.abs(lo.savings - hi.savings)),
 		reversed: hi.savings < lo.savings,
 		ranks: [a, b].map((c) => ({ city: c.city, salary: f$(c.salary), sRank: ord(rS.indexOf(c.city) + 1), save: f$(c.savings), vRank: ord(rV.indexOf(c.city) + 1) })),
-		rExp: corr(salaries, data.cities.map((c) => c.expenses)).toFixed(2),
-		rSav: corr(salaries, data.cities.map((c) => c.savings)).toFixed(2)
+		total: metros.length,
+		rExp: corr(salaries, metros.map((c) => c.expenses)).toFixed(2),
+		rSav: corr(salaries, metros.map((c) => c.savings)).toFixed(2)
 	};
 }
 

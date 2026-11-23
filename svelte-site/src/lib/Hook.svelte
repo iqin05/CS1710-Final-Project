@@ -2,18 +2,18 @@
 	import { onMount, untrack } from 'svelte';
 	import * as d3 from 'd3';
 	import scrollama from 'scrollama';
-	import { ALL, f$ } from '#lib/data.js';
+	import { ALL, f$, metrosInField } from '#lib/data.js';
 	import { usMap } from '#lib/geo.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
-	import OfferEditor from '#lib/OfferEditor.svelte';
 
 	// HOOK: a full-screen U.S. map stays pinned while three short cards scroll past.
 	//   1. setup: the whole country, and the two offer pins drop in.
 	//   2. pull:  the map flies in to frame the two cities; the bigger paycheck catches your eye.
-	//   3. turn:  salary is only part of the story; the offer letters appear and the reader decides.
+	//   3. turn:  salary is only part of the story; which city gives you the better start?
 	// The map moves on its own only when a card arrives; in between, the reader can zoom (+ / −,
-	// trackpad pinch, Ctrl + scroll) and drag to pan. Clicking a metro makes it Offer A (shift: B).
-	let { data, offers, setOffer, onrandomize, onreset } = $props();
+	// trackpad pinch, Ctrl + scroll) and drag to pan. The offers are fixed (the same story for every
+	// reader); changing them waits for the final "Try other offers" step.
+	let { data, offers } = $props();
 
 	const STEPS = ['setup', 'pull', 'turn'];
 	// -1 before the first card arrives (pins not dropped yet).
@@ -24,7 +24,8 @@
 	const BASE_H = 600;
 	const { projection, paths } = usMap(BASE_W, BASE_H);
 
-	let points = $derived(data.cities.map((c) => ({ ...c, p: projection([c.lon, c.lat]) })));
+	// Every metro at its typical entry-level salary in the story's field (shown on hover).
+	let points = $derived(metrosInField(data, offers.A.field).map((c) => ({ ...c, p: projection([c.lon, c.lat]) })));
 	const at = (city) => points.find((d) => d.city === city).p;
 
 	let box;
@@ -36,15 +37,9 @@
 	let zoom;
 	let reduced = false;
 	// Wide layout: cards in a left column over the map. Narrow: cards scroll over the map full width.
-	// Either way the offer letters sit right under the last card and arrive with it.
 	let wideLayout = $state(true);
 	// Right edge of the card column, in px (left inset + width + gap); keep in step with the CSS.
 	const COL_RIGHT = 20 + 360 + 24;
-	const TURN_RIGHT = 20 + 640 + 24;
-
-	// Changing cities by clicking the map only starts with the last card, once the story has
-	// introduced the offers as something the reader can change.
-	let interactive = $derived(step === 2);
 
 	// Markers are placed in screen space so they stay the same size at every zoom level.
 	const sx = (p) => t.applyX(p[0]);
@@ -52,13 +47,13 @@
 	const minK = () => Math.min(cw / BASE_W, ch / BASE_H) * 0.5;
 
 	// The part of the map the cards leave open, in map-box pixels.
-	function openArea(withLetters) {
+	function openArea() {
 		if (!wideLayout) return { x0: cw * 0.06, x1: cw * 0.94, y0: ch * 0.08, y1: ch * 0.48 };
-		return { x0: withLetters ? TURN_RIGHT : COL_RIGHT, x1: cw - 90, y0: 24, y1: ch - 24 };
+		return { x0: COL_RIGHT, x1: cw - 90, y0: 24, y1: ch - 24 };
 	}
 	// Fit a base-space box into the open area, filling `fill` of it.
-	function fit([x0, y0, x1, y1], fill, withLetters) {
-		const o = openArea(withLetters);
+	function fit([x0, y0, x1, y1], fill) {
+		const o = openArea();
 		const k = Math.max(
 			minK(),
 			Math.min(8, ((o.x1 - o.x0) * fill) / Math.max(40, x1 - x0), ((o.y1 - o.y0) * fill) / Math.max(40, y1 - y0))
@@ -66,12 +61,12 @@
 		const [cx, cy] = [(o.x0 + o.x1) / 2, (o.y0 + o.y1) / 2];
 		return d3.zoomIdentity.translate(cx - k * ((x0 + x1) / 2), cy - k * ((y0 + y1) / 2)).scale(k);
 	}
-	const usView = () => fit([0, 0, BASE_W, BASE_H], 0.96, false);
-	function pairView(withLetters) {
+	const usView = () => fit([0, 0, BASE_W, BASE_H], 0.96);
+	function pairView() {
 		const [a, b] = [at(offers.A.city), at(offers.B.city)];
-		return fit([Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])], 0.55, withLetters);
+		return fit([Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])], 0.55);
 	}
-	const viewFor = (s) => (s >= 1 ? pairView(s === 2) : usView());
+	const viewFor = (s) => (s >= 1 ? pairView() : usView());
 
 	const sel = () => d3.select(svgEl);
 	const dur = (ms) => (reduced ? 0 : ms);
@@ -80,7 +75,7 @@
 		sel().transition().duration(dur(ms)).call(zoom.transform, view);
 	}
 	const zoomBy = (f) => sel().transition().duration(dur(250)).call(zoom.scaleBy, f);
-	const frameOffers = () => go(pairView(step === 2), 650);
+	const frameOffers = () => go(pairView(), 650);
 
 	onMount(() => {
 		reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -137,14 +132,6 @@
 		const s = step;
 		untrack(() => go(viewFor(s), 1000));
 	});
-	// When either offer moves to another city, re-frame on the new pair (once the map is zoomed in).
-	let pairKey = $derived(`${offers.A.city}|${offers.B.city}`);
-	let lastPair = '';
-	$effect(() => {
-		const k = pairKey;
-		if (lastPair && k !== lastPair) untrack(() => step >= 1 && go(pairView(step === 2), 650));
-		lastPair = k;
-	});
 
 	// Offer pins: label beside the pin, flipped to the left near the right edge. When the two pins
 	// are close on screen (zoomed out, or on a phone), A's label sits above its pin and B's below,
@@ -178,19 +165,6 @@
 	);
 </script>
 
-{#snippet letters()}
-	<div class="editors">
-		{#each ['A', 'B'] as k}
-			<OfferEditor {data} key={k} offer={offers[k]} onchange={(patch) => setOffer(k, patch)} />
-		{/each}
-	</div>
-	<div class="actions">
-		<button class="ghost primary" onclick={onrandomize}>Randomize offers</button>
-		<button class="ghost" onclick={onreset}>Reset to default</button>
-		<span class="hint">Shift-click a city on the map for Offer B</span>
-	</div>
-{/snippet}
-
 <section class="hook" id="hook">
 	<div class="stage">
 		<div class="pinned">
@@ -211,27 +185,21 @@
 					{/if}
 					<g>
 						{#each points as d (d.city)}
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<circle
 								class="metro"
 								class:dim={step >= 0 && d.city !== offers.A.city && d.city !== offers.B.city}
-								class:clickable={interactive}
-								aria-disabled={!interactive}
 								cx={sx(d.p)}
 								cy={sy(d.p)}
 								r="6"
-								role="button"
-								tabindex="-1"
+								role="img"
 								aria-label="{d.city}, {d.state}"
 								onpointermove={(e) =>
 									showTip(e, {
 										title: `${d.city}, ${d.state}`,
 										meta: d.region,
-										rows: [[f$(d.salary), 'typical entry salary']],
-										note: interactive ? 'Click to make this Offer A · shift-click for Offer B' : undefined
+										rows: [[f$(d.salary), `typical entry salary, ${offers.A.field}`]]
 									})}
 								onpointerleave={hideTip}
-								onclick={(e) => interactive && setOffer(e.shiftKey ? 'B' : 'A', { city: d.city })}
 							/>
 						{/each}
 					</g>
@@ -264,12 +232,14 @@
 
 		<div class="steps">
 			{#each STEPS as id, i (id)}
-				<div class="step" class:turn={id === 'turn'} bind:this={stepEls[i]}>
-					<div class="block">
+				<div class="step" bind:this={stepEls[i]}>
 					<div class="card" class:active={step === i}>
 						{#if id === 'setup'}
 							<p class="beat">Imagine this</p>
-							<p class="prose">You're graduating with two entry-level offers, both in cities you've never lived in:</p>
+							<p class="prose">
+								You're graduating with two entry-level offers in <strong>{offers.A.field === ALL ? 'your field' : offers.A.field.toLowerCase()}</strong>,
+								both in cities you've never lived in:
+							</p>
 							{#each ['A', 'B'] as k}
 								<div class="offerline {k.toLowerCase()}">
 									<b>{f$(offers[k].salary)} in {offers[k].city}</b>
@@ -293,16 +263,7 @@
 								<li>the <strong>lifestyle</strong> you want</li>
 							</ul>
 							<h2>So, which city gives you the better start?</h2>
-							<p class="try">
-								<strong>Give it a go:</strong> change the field or city in the offers below, or click any city
-								on the map to make it Offer A.
-							</p>
 						{/if}
-					</div>
-					{#if id === 'turn'}
-						<!-- The offer letters, left-aligned under the card; usable once this card is active. -->
-						<div class="letters" class:active={interactive} inert={!interactive}>{@render letters()}</div>
-					{/if}
 					</div>
 				</div>
 			{/each}
@@ -353,9 +314,6 @@
 		stroke-width: 1.5;
 		outline: none;
 		transition: fill-opacity 400ms;
-	}
-	.metro.clickable {
-		cursor: pointer;
 	}
 	.metro.dim {
 		fill-opacity: 0.35;
@@ -450,8 +408,6 @@
 	.zoom .hint {
 		max-width: 150px;
 		text-align: right;
-	}
-	.hint {
 		font-size: 11px;
 		color: var(--muted);
 	}
@@ -465,10 +421,6 @@
 	}
 	.step {
 		min-height: 95vh;
-	}
-	/* The last card holds the screen a while so the reader can try the offer letters. */
-	.step:last-child {
-		min-height: 140vh;
 	}
 	.card {
 		pointer-events: auto;
@@ -518,17 +470,6 @@
 		display: block;
 		color: var(--muted);
 	}
-	.try {
-		margin: 10px 0 0;
-		padding-top: 10px;
-		border-top: 1px solid var(--grid);
-		font-size: 14px;
-		color: var(--ink-2);
-	}
-	.try strong {
-		color: var(--accent);
-		font-weight: 650;
-	}
 	.factors {
 		margin: 0;
 		padding-left: 18px;
@@ -543,62 +484,15 @@
 		font-weight: 600;
 	}
 
-	/* The last step: the card and the offer letters form one left-aligned block, as wide as the two
-	   letters side by side. It scrolls in, holds at the top while the reader tries the letters, and
-	   scrolls away with the step. */
-	.block {
-		width: 360px;
-	}
-	.turn .block {
-		width: 640px;
-		position: sticky;
-		top: 20px;
-	}
-	.turn .card {
-		width: auto;
-	}
-	.letters {
-		pointer-events: auto;
-		margin-top: 12px;
-		opacity: 0.45;
-		transition: opacity 300ms;
-	}
-	.letters.active {
-		opacity: 1;
-	}
-	.editors {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 10px;
-	}
-	.editors :global(.offer) {
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-	}
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px;
-		margin-top: 10px;
-	}
-
-	/* Narrower screens: cards scroll full width over the map; the letters ride in the last card. */
+	/* Narrower screens: cards scroll full width over the map. */
 	@media (max-width: 1099px) {
 		.steps {
 			padding: 55vh 16px 0;
 		}
-		.block,
-		.turn .block {
+		.card {
 			width: auto;
 			max-width: 640px;
 			margin: 0 auto;
-			position: static;
-		}
-		.card {
-			width: auto;
-			opacity: 1;
-		}
-		.letters {
 			opacity: 1;
 		}
 		.zoom {
@@ -607,11 +501,6 @@
 		}
 		.zoom .hint {
 			display: none;
-		}
-	}
-	@media (max-width: 600px) {
-		.editors {
-			grid-template-columns: 1fr;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

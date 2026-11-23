@@ -5,6 +5,8 @@ import { asset } from '$app/paths';
 // site/build_data.py, but reads the CSVs directly instead of a generated data.js.
 
 export const ALL = 'All fields';
+/** The story's field: both offers are entry-level Business & Finance jobs, for every reader. */
+export const STORY_FIELD = 'Business & Finance';
 export const REGIONS = ['Northeast', 'Midwest', 'South', 'West'];
 
 export const f$ = d3.format('$,.0f');
@@ -88,6 +90,15 @@ export async function loadData() {
 		d3.csv(asset('city_by_field.csv'))
 	]);
 	const cities = cityRows.map(cityRow);
+	const byField = fieldIndex(fieldRows);
+	// Alphabetical, with the catch-all "Other" last.
+	const fields = [...new Set(fieldRows.map((r) => r.field))].filter((f) => f !== 'Other').sort();
+	fields.push('Other');
+	return { cities, byCity: Object.fromEntries(cities.map((c) => [c.city, c])), byField, fields };
+}
+
+/** city_by_field.csv rows → { [city]: { [field]: { salary, take, savings, jobs } } }, salary at the 25th percentile. */
+export function fieldIndex(fieldRows) {
 	const byField = {};
 	for (const r of fieldRows) {
 		(byField[r.city] ??= {})[r.field] = {
@@ -97,10 +108,22 @@ export async function loadData() {
 			jobs: num(r.entry_level_jobs)
 		};
 	}
-	// Alphabetical, with the catch-all "Other" last.
-	const fields = [...new Set(fieldRows.map((r) => r.field))].filter((f) => f !== 'Other').sort();
-	fields.push('Other');
-	return { cities, byCity: Object.fromEntries(cities.map((c) => [c.city, c])), byField, fields };
+	return byField;
+}
+
+/**
+ * Every metro as seen by a new grad in `field`: the city row with salary, take-home, what's left
+ * over and rent share swapped for that field's typical entry-level (25th-percentile) numbers.
+ * Metros without data in the field are left out. ALL returns the blended all-fields rows.
+ */
+export function metrosInField(data, field) {
+	if (field === ALL) return data.cities;
+	return data.cities
+		.map((c) => {
+			const f = data.byField[c.city]?.[field];
+			return f && { ...c, salary: f.salary, take: f.take, savings: f.savings, rentShare: c.housing / f.take };
+		})
+		.filter(Boolean);
 }
 
 /** Salary, take-home, savings and jobs for a city in one field (or all fields). */
@@ -178,5 +201,11 @@ export function titleEcon(data, offers) {
 	return { A: one(offers.A), B: one(offers.B) };
 }
 
-/** The opening pair: New York vs. Detroit, any field, at their local entry-level salaries. */
-export const defaultOffers = (data) => ({ A: offerAt(data, 'New York', ALL), B: offerAt(data, 'Detroit', ALL) });
+/**
+ * The story's pair, the same for every reader: New York vs. Detroit, both entry-level Business &
+ * Finance offers at that city × field's typical (25th-percentile) salary. Needs `data.byField`.
+ */
+export const defaultOffers = (data) => ({
+	A: offerAt(data, 'New York', STORY_FIELD),
+	B: offerAt(data, 'Detroit', STORY_FIELD)
+});

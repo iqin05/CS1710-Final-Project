@@ -1,13 +1,16 @@
 <script>
 	import * as d3 from 'd3';
-	import { f$, fPct, calc } from '#lib/data.js';
+	import { ALL, f$, fPct, calc, metrosInField } from '#lib/data.js';
 	import { axis, gridAxis } from '#lib/axis.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 
 	// RISING INSIGHTS 3: rent across the 40 metros, with the two offer cities highlighted.
 	// x: monthly studio rent (HUD fair market rent, what a new mover pays); y: that rent as a share of
-	// take-home pay on the metro's typical entry-level salary.
+	// take-home pay on the metro's typical entry-level (25th-percentile) salary in the offers' field.
 	let { data, offers } = $props();
+
+	let metros = $derived(metrosInField(data, offers.A.field));
+	let fieldTxt = $derived(offers.A.field === ALL ? 'entry' : offers.A.field);
 
 	const W = 900;
 	const H = 400;
@@ -15,14 +18,14 @@
 	let x = $derived(
 		d3
 			.scaleLinear()
-			.domain(d3.extent(data.cities, (d) => d.housing))
+			.domain(d3.extent(metros, (d) => d.housing))
 			.nice()
 			.range([M.l, W - M.r])
 	);
 	let y = $derived(
 		d3
 			.scaleLinear()
-			.domain([0, d3.max(data.cities, (d) => d.rentShare) * 1.08])
+			.domain([0, d3.max(metros, (d) => d.rentShare) * 1.08])
 			.nice()
 			.range([H - M.b, M.t])
 	);
@@ -31,7 +34,7 @@
 
 	const keyOf = (city) => (city === offers.A.city ? 'a' : city === offers.B.city ? 'b' : '');
 	// Offer cities draw last so they sit on top.
-	let dots = $derived([...data.cities].sort((p, q) => (keyOf(p.city) ? 1 : 0) - (keyOf(q.city) ? 1 : 0)));
+	let dots = $derived([...metros].sort((p, q) => (keyOf(p.city) ? 1 : 0) - (keyOf(q.city) ? 1 : 0)));
 
 	// Rank by rent, most expensive first.
 	let byRent = $derived([...data.cities].sort((p, q) => q.housing - p.housing).map((c) => c.city));
@@ -60,7 +63,7 @@
 		<div class="card">
 			<h3>Studio rent vs. how much of the paycheck it takes</h3>
 			<p class="sub">
-				Each dot is a metro. Rent share is on that metro's typical entry-level salary; the cards above use your offers.
+				Each dot is a metro. Rent share is on that metro's typical {fieldTxt} salary (25th percentile); the cards above use your offers.
 			</p>
 			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Scatterplot of studio rent against rent share of take-home pay for 40 metros">
 				<g class="axis" transform="translate(0,{H - M.b})" {@attach axis(xAxis)}></g>
@@ -83,8 +86,8 @@
 								meta: d.region,
 								rows: [
 									[f$(d.housing) + '/mo', 'studio rent'],
-									[fPct(d.rentShare), 'of take-home, typical entry salary'],
-									[f$(d.salary), 'typical entry salary']
+									[fPct(d.rentShare), `of take-home, typical ${fieldTxt} salary`],
+									[f$(d.salary), `typical ${fieldTxt} salary`]
 								]
 							})}
 						onpointerleave={hideTip}

@@ -186,7 +186,7 @@
 					<svg
 						viewBox="0 0 {VW} {VH}"
 						role="img"
-						aria-label="Offer {p.key}: {f$(p.salary)} a year, drawn as {p.n} bundles of {f$(SALARY_STEP)}. As you scroll, bundles go to taxes, rent and everyday costs."
+						aria-label="Job Offer {p.key}: {f$(p.salary)} a year, drawn as {p.n} bundles of {f$(SALARY_STEP)}. As you scroll, bundles go to taxes, rent and everyday costs."
 					>
 						<g class="money">
 						{#each p.bundles as b (b.i)}
@@ -205,7 +205,7 @@
 						{#each CATS as c}<li>{c}</li>{/each}
 					</ul>
 					<figcaption>
-						<b>Offer {p.key}</b>
+						<b>Job Offer {p.key}</b>
 						<span class="amt">
 							{#if done(p) && progress > 0}? / year{:else}{f$(left(p))} / year{/if}
 						</span>
@@ -214,10 +214,8 @@
 			{/each}
 
 			<div class="center">
-				<h1>Beyond the<br />First Paycheck</h1>
-				<p class="after">
-					What's left after a year of everyday living?
-				</p>
+				<h1>Beyond the First Paycheck</h1>
+				<p class="after">What's left after a year of everyday living?</p>
 			</div>
 		</div>
 
@@ -252,26 +250,32 @@
 		width: 100%;
 		max-width: 1400px;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-		grid-template-areas: 'a center b';
+		/* Title and caption centered on top, the two piles centered side by side beneath. */
+		/* The title row spans the full width (it's wider than the two piles together, and would
+		   otherwise spill off-center); the piles sit in the two middle columns. */
+		grid-template-columns: minmax(0, 1fr) minmax(0, 420px) minmax(0, 420px) minmax(0, 1fr);
+		grid-template-areas:
+			'center center center center'
+			'. a b .';
 		align-items: end;
-		gap: 24px;
+		gap: 48px 40px;
 	}
 	.center {
 		grid-area: center;
-		align-self: center;
 		text-align: center;
 	}
 	h1 {
-		font-size: clamp(36px, 5.4vw, 80px);
-		line-height: 1.02;
-		/* Two lines, "Beyond the / First Paycheck" (the break is in the markup). */
-		margin: 0 auto;
+		font-size: clamp(32px, 5.2vw, 84px);
+		line-height: 1.05;
+		/* One line. */
+		white-space: nowrap;
+		margin: 0;
 	}
+	/* The caption sits right under the title on a single line. */
 	.after {
-		max-width: 26ch;
-		margin: 40px auto 0;
-		font-size: 17px;
+		margin: 20px 0 0;
+		font-size: clamp(17px, 1.6vw, 23px);
+		white-space: nowrap;
 		color: var(--ink-2);
 	}
 
@@ -426,9 +430,15 @@
 				'a b';
 			gap: 36px 20px;
 		}
+		/* Too narrow for the title on one line: let it wrap. */
+		h1 {
+			white-space: normal;
+		}
 		.after {
-			margin-top: 24px;
-			font-size: 14px;
+			margin-top: 14px;
+			font-size: 16px;
+			/* Too narrow to guarantee one line on small phones. */
+			white-space: normal;
 		}
 		figcaption b {
 			font-size: 12px;

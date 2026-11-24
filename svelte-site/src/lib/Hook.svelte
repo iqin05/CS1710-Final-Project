@@ -151,7 +151,7 @@
 	// Projected once into a fixed base space; zooming transforms that space onto the screen.
 	const BASE_W = 960;
 	const BASE_H = 600;
-	const { projection, paths } = usMap(BASE_W, BASE_H);
+	const { projection, paths, outline } = usMap(BASE_W, BASE_H);
 
 	// Every metro at its typical entry-level salary in the story's field (shown on hover).
 	let points = $derived(metrosInField(data, offers.A.field).map((c) => ({ ...c, p: projection([c.lon, c.lat]) })));
@@ -649,8 +649,24 @@
 			role="img"
 			aria-label="Map of 40 U.S. metros with the two offer cities marked, {offers.A.city} and {offers.B.city}, about {miles} miles apart"
 		>
-			<g transform="translate({zt.x},{zt.y}) scale({zt.k})">
-				{#each paths as s (s.id)}<path class="state" d={s.d} />{/each}
+			<!-- The country, drawn like the doodles: a flat offset shadow (same as the sketched boxes),
+			     flat state fills with thin ink borders, and a heavier ink line around the outside.
+			     The filter sits outside the zoom so its wobble stays the same size at every zoom. -->
+			<!-- The shared `doodle` roughening, but with its working area held to the visible map:
+			     the shared filter sizes itself to the drawing, which zoomed in is many screens wide,
+			     more than browsers will filter (they render it black). -->
+			<defs>
+				<filter id="map-doodle" filterUnits="userSpaceOnUse" x="0" y="0" width={cw} height={ch}>
+					<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" />
+					<feDisplacementMap in="SourceGraphic" scale="1.8" />
+				</filter>
+			</defs>
+			<g class="land-doodle">
+				<path class="land-shadow" d={outline} transform="translate({zt.x + 5},{zt.y + 5}) scale({zt.k})" />
+				<g transform="translate({zt.x},{zt.y}) scale({zt.k})">
+					{#each paths as s (s.id)}<path class="state" d={s.d} />{/each}
+					<path class="nation" d={outline} />
+				</g>
 			</g>
 			{#if link}
 				<line class="link" class:shown={t >= tLink} x1={link[0]} y1={link[1]} x2={link[2]} y2={link[3]} />
@@ -770,7 +786,7 @@
 
 	<!-- Act 3's turn card, at the end of the scroll. -->
 	<div class="turn" class:shown={showCard} inert={!showCard}>
-		<SketchBox r={18} seed={BOX_SEED} shadow="var(--grid)" />
+		<SketchBox r={18} seed={BOX_SEED} shadow="var(--accent)" />
 		<p class="prose">Salary is only one part of the story. Also weigh:</p>
 		<ul class="factors">
 			<li><strong>what’s left over</strong> after living expenses</li>
@@ -778,7 +794,7 @@
 			<li>the <strong>lifestyle</strong> you want</li>
 		</ul>
 		<h2>So, which city gives you the better start?</h2>
-		<p class="next">Scroll to find out <span aria-hidden="true">↓</span></p>
+		<p class="next">SCROLL TO FIND OUT <span aria-hidden="true">↓</span></p>
 	</div>
 
 	<!-- The salary beat's spotlight: the screen dims around the two salary lines. -->
@@ -796,13 +812,13 @@
 
 	<!-- Narration: the opening title card, then one callout at a time beside the action. -->
 	<div class="title-card" style:opacity={titleO} aria-hidden={titleO < 0.5}>
-		<!-- Styled like the turn card: ink outline, gray shadow. -->
-		<SketchBox r={18} seed={BOX_SEED} shadow="var(--grid)" />
+		<!-- Ink outline, with a shadow in the same accent color as "Imagine this". -->
+		<SketchBox r={18} seed={BOX_SEED} shadow="var(--accent)" />
 		<p class="beat">Imagine this</p>
 		<p class="title-text">
 			You're about to graduate, and two entry-level offers in {fieldTxt} just landed in your inbox.
 		</p>
-		<p class="title-hint">Scroll to follow the story <span aria-hidden="true">↓</span></p>
+		<p class="title-hint">KEEP SCROLLING <span aria-hidden="true">↓</span></p>
 	</div>
 	{#if co}
 		<svg class="arrows" width={cw} height="100%" aria-hidden="true" style:opacity={co.o}>
@@ -862,8 +878,8 @@
 		z-index: 2;
 		opacity: 0;
 		pointer-events: none;
-		/* Solid, so the result panel covers the inbox as it grows. */
-		background: var(--page);
+		/* Solid, so the result panel covers the inbox as it grows. Same white as the email letters. */
+		background: var(--surface);
 	}
 	.map-box.shown {
 		opacity: 1;
@@ -882,24 +898,46 @@
 	.map:active {
 		cursor: grabbing;
 	}
+	/* The doodled map: same ink (#23211e) and `doodle` roughening as the known-for icons. */
+	.land-doodle {
+		filter: url(#map-doodle);
+	}
+	.land-shadow {
+		fill: var(--grid);
+	}
 	.map :global(path.state) {
+		/* Same as the salary box and the inbox background. */
+		fill: var(--page);
+		stroke: #23211e;
+		stroke-opacity: 0.55;
+		stroke-linejoin: round;
 		vector-effect: non-scaling-stroke;
-		stroke-width: 1;
+		stroke-width: 1.1;
+	}
+	.nation {
+		fill: none;
+		stroke: #23211e;
+		stroke-width: 2.3;
+		stroke-linejoin: round;
+		stroke-linecap: round;
+		vector-effect: non-scaling-stroke;
 	}
 	.metro {
 		fill: var(--series-soft);
-		fill-opacity: 0.8;
-		stroke: var(--surface);
-		stroke-width: 1.5;
+		stroke: #23211e;
+		stroke-width: 1.4;
 		outline: none;
 	}
 	.metro.dim {
-		fill-opacity: 0.35;
+		fill-opacity: 0.45;
+		stroke-opacity: 0.45;
 	}
 	.link {
-		stroke: var(--axis);
-		stroke-width: 1.5;
-		stroke-dasharray: 4 4;
+		stroke: #23211e;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-dasharray: 2 7;
+		filter: url(#doodle);
 		opacity: 0;
 		transition: opacity 500ms;
 	}
@@ -933,8 +971,11 @@
 		transform: none;
 	}
 	.pin circle {
-		stroke: var(--surface);
-		stroke-width: 3;
+		stroke: #23211e;
+		stroke-width: 2.3;
+	}
+	.land > circle {
+		filter: url(#doodle);
 	}
 	.lbl {
 		font-size: 14px;
@@ -1191,7 +1232,8 @@
 		z-index: 3;
 		width: 360px;
 		padding: 16px 18px;
-		/* A sketched box (SketchBox) behind the text: pen-drawn outline, soft gray shadow. */
+		/* A sketched box (SketchBox) behind the text: pen-drawn outline, shadow in the accent color
+		   of "Scroll to find out". */
 		isolation: isolate;
 		opacity: 0;
 		transform: translateY(calc(-50% + 16px));
@@ -1229,8 +1271,9 @@
 		margin: 12px 0 0;
 		padding-top: 10px;
 		border-top: 1px solid var(--grid);
-		font-size: 14px;
-		font-weight: 650;
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.14em;
 		color: var(--accent);
 	}
 
@@ -1278,8 +1321,13 @@
 	}
 	.title-hint {
 		margin: 16px 0 0;
-		font-size: 13px;
-		color: var(--muted);
+		/* A step smaller than "Imagine this" (13px). */
+		font-size: 11px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		/* Same look as the "Imagine this" label. */
+		font-weight: 700;
+		color: var(--accent);
 	}
 	/* Callouts: a short line beside the action, with hand-drawn arrows to what it's about. */
 	.arrows {

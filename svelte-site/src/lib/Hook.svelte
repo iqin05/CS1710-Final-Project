@@ -5,14 +5,21 @@
 	import { usMap } from '#lib/geo.js';
 	import { showTip, hideTip } from '#lib/tooltip.svelte.js';
 	import Inbox from '#lib/Inbox.svelte';
+	import Taskbar from '#lib/Taskbar.svelte';
+	import SketchBox from '#lib/SketchBox.svelte';
+	// Every narration box is drawn with the same hand-drawn wobble (the "never lived there" box's).
+	const BOX_SEED = 9;
 
-	// HOOK: scrollytelling over a full-screen inbox. The screen stays pinned while the reader
-	// scrolls, and the narration changes underneath:
+	// HOOK: scrollytelling on "your computer": a full-screen inbox above an always-visible taskbar
+	// (its clock set to graduation season). The screen stays pinned while the reader scrolls.
+	// Narration: an "Imagine this" title card over the dimmed inbox opens the story; after that,
+	// each line is a callout beside what it's about, with a hand-drawn arrow pointing at it.
 	//   act 1, inbox:  Offer A's email is open; Offer B's sits unread with a pulsing red dot. An
 	//                  enlarged cursor (the story's, not the reader's) clicks it, the two offer
 	//                  letters open side by side, and the cursor leaves.
 	//   act 2, salary: the bigger paycheck catches your eye: both salary lines are marked.
-	//   act 3, map:    "you've never lived in either city": the U.S. map fades in as an overview, each
+	//   act 3, map:    "you've never lived in either city": the taskbar search types the question,
+	//                  and its result grows up out of the search box into a U.S. map overview. Each
 	//                  letterhead flies out of its letter and lands as that city's pin while the map
 	//                  zooms in to frame the pair, and the turn card asks which city gives you the
 	//                  better start.
@@ -24,24 +31,30 @@
 
 	// ---------- the script (seconds) ----------
 	const T = {
-		cap1: 0, // "Imagine this…"
-		cursorIn: 1.4,
-		cap2: 4.4, // A's is open, B's is unread
-		move1: 4.6, // cursor heads for B's row (it waits just beside it)
-		hoverB: 5.2,
-		click: 5.6, // pressed until click + PRESS, so the click holds through some scroll
-		split: 6.5, // both letters side by side; the cursor fades out as they open
-		cap3: 7.3, // the bigger paycheck, once both letters are open
-		hlA: 7.7, // salary markers, A then B, as "catches your eye" comes in
-		hlB: 8.2,
-		cap4: 13.0, // "but you've never lived in either city"
-		fly: 15.0, // letterheads leave for the map
+		title: 1.4, // the "Imagine this" card holds until here, then fades over TITLE_FADE
+		cursorIn: 2.4,
+		cap2: 2.8, // callout: A's is open, B's is unread
+		move1: 4.2, // cursor heads for B's row (it waits just beside it)
+		hoverB: 4.8,
+		click: 5.2, // pressed until click + PRESS, so the click holds through some scroll
+		split: 6.1, // both letters side by side; the cursor fades out as they open
+		cap3: 6.7, // callout: the bigger paycheck, once both letters are open
+		hlA: 7.1, // salary markers, A then B, as the callout comes in
+		hlB: 7.6,
+		cap4: 11.6, // callout: "but you've never lived in either city"; the inbox dims
+		type0: 12.2, // the taskbar search types the question
+		type1: 13.8,
+		grow: 14.4, // the search result grows out of the search box into the map
+		growDur: 0.9,
+		fly: 14.8, // letterheads leave for the map, over the growing result panel
 		flyDur: 2.0,
 		stagger: 0.25,
-		cap5: 17.8, // distance
+		cap5: 17.5, // callout: distance
 		card: 20.0, // turn card; the map is the reader's
 		end: 20.4
 	};
+	const TITLE_FADE = 0.8;
+	const QUERY = 'How far is New York from Detroit?';
 	const landed = (k) => T.fly + (k === 'B' ? T.stagger : 0) + T.flyDur;
 	const tLink = landed('B') + 0.1;
 
@@ -84,8 +97,19 @@
 	let pressB = $derived(t >= T.click && t < T.click + PRESS);
 	let hl = $derived({ A: t >= T.hlA, B: t >= T.hlB });
 	let flown = $derived({ A: t >= T.fly, B: t >= T.fly + T.stagger });
-	let inboxGone = $derived(t >= T.fly + 0.45);
-	let mapIn = $derived(t >= T.fly);
+	let inboxGone = $derived(t >= T.grow + T.growDur);
+	let mapIn = $derived(t >= T.grow);
+	// The title card (and the dim behind it) at the start, and the dim while the search types.
+	let titleO = $derived(t < T.title ? 1 : Math.max(0, 1 - (t - T.title) / TITLE_FADE));
+	let searchDim = $derived(t < T.cap4 ? 0 : Math.min(1, (t - T.cap4) / 0.5));
+	// One dim strength for every overlay beat (title card, salary spotlight, search), so the
+	// background stays readable while the focus is clear.
+	const DIM = 0.45;
+	// The taskbar search: active from the "never lived there" callout, typed by scroll.
+	let searching = $derived(t >= T.cap4 && t < T.grow + T.growDur);
+	let query = $derived(
+		t < T.type0 ? '' : QUERY.slice(0, Math.round(Math.min(1, (t - T.type0) / (T.type1 - T.type0)) * QUERY.length))
+	);
 	let showCard = $derived(t >= T.card);
 	// The map takes the reader's own mouse only once the story has handed it over.
 	let interactive = $derived(showCard);
@@ -101,38 +125,27 @@
 		return Math.round((d3.geoDistance([a.lon, a.lat], [b.lon, b.lat]) * 3958.8) / 10) * 10;
 	});
 
-	// The narration, one caption at a time.
-	let captions = $derived([
+	// The narration after the title card: one callout at a time, each placed beside what it's about
+	// (positions are worked out from the page in the effect below).
+	let callouts = $derived([
+		{ id: 'unread', from: T.cap2, to: T.split + 0.2, text: `You've already read ${offers.A.city}'s offer. ${offers.B.city}'s is still unread…` },
 		{
-			from: T.cap1,
-			to: T.cap2,
-			beat: 'Imagine this',
-			text: `You're about to graduate, and two entry-level offers in ${fieldTxt} just landed in your inbox.`
-		},
-		{ from: T.cap2, to: T.cap3, text: `You've already read ${offers.A.city}'s. ${offers.B.city}'s is still unread…` },
-		{
+			id: 'salaries',
 			from: T.cap3,
-			to: T.cap4,
+			to: T.cap4 - 0.2,
 			text: bigger
-				? `${bigger.city}'s bigger paycheck catches your eye: ${f$(bigger.salary)} a year, against ${f$(smaller.salary)} in ${smaller.city}.`
+				? `${bigger.city}'s bigger paycheck catches your eye: ${f$(bigger.salary)} against ${f$(smaller.salary)}.`
 				: 'Both pay the same, so the number alone can’t decide.'
 		},
-		{ from: T.cap4, to: T.cap5, text: 'But you’ve never lived in either city. Does earning more mean you’re better off?' },
+		{ id: 'search', from: T.cap4, to: T.grow, text: 'But you’ve never lived in either city…' },
 		{
+			id: 'distance',
 			from: T.cap5,
 			to: T.card,
-			text: `${offers.A.city} and ${offers.B.city} are about ${miles.toLocaleString()} miles apart. Either offer means moving somewhere new.`
+			text: `About ${miles.toLocaleString()} miles apart. Either offer means moving somewhere new.`
 		}
 	]);
-	let caption = $derived(captions.find((c) => t >= c.from && t < c.to) ?? null);
-	// Each caption slides up in as its stretch of scroll begins and up out as it ends.
-	let capMotion = $derived.by(() => {
-		if (!caption) return { o: 0, y: 0 };
-		const u = (t - caption.from) / (caption.to - caption.from);
-		const enter = caption.from === 0 ? 1 : Math.max(0, Math.min(1, u / 0.12));
-		const exit = Math.max(0, Math.min(1, (1 - u) / 0.12));
-		return { o: Math.min(enter, exit), y: (1 - enter) * 28 - (1 - exit) * 28 };
-	});
+	let callout = $derived(callouts.find((c) => t >= c.from && t < c.to) ?? null);
 
 	// ---------- the map ----------
 	// Projected once into a fixed base space; zooming transforms that space onto the screen.
@@ -166,8 +179,8 @@
 	// The part of the map the turn card and the narration leave open, in map-box pixels.
 	function openArea() {
 		// Narrow: generous side margins so both pin labels fit on screen.
-		if (!wideLayout) return { x0: 70, x1: cw - 70, y0: ch * 0.08, y1: ch * 0.48 };
-		return { x0: COL_RIGHT, x1: cw - 70, y0: 30, y1: ch - (cw < 1240 ? 130 : 80) };
+		if (!wideLayout) return { x0: 70, x1: cw - 70, y0: ch * 0.08, y1: ch * 0.5 };
+		return { x0: COL_RIGHT, x1: cw - 70, y0: 30, y1: ch - 40 };
 	}
 	// A view: base-space point (bx, by) shown at screen point (ax, ay), at scale k. Fits `box` (base
 	// space) into the screen area `o`, filling `fill` of it.
@@ -179,9 +192,8 @@
 		return { bx: (x0 + x1) / 2, by: (y0 + y1) / 2, ax: (o.x0 + o.x1) / 2, ay: (o.y0 + o.y1) / 2, k };
 	}
 	const toTransform = (v) => d3.zoomIdentity.translate(v.ax - v.k * v.bx, v.ay - v.k * v.by).scale(v.k);
-	// The overview: the whole lower 48, filling the screen above the narration.
-	const usV = () =>
-		fitView([0, 0, BASE_W, BASE_H], 0.96, { x0: 16, x1: cw - (cw < 1240 ? 16 : 56), y0: 16, y1: ch - (cw < 1240 ? 130 : 90) });
+	// The overview: the whole lower 48, filling the screen above the taskbar.
+	const usV = () => fitView([0, 0, BASE_W, BASE_H], 0.94, { x0: 16, x1: cw - (cw < 1240 ? 16 : 56), y0: 16, y1: ch - 16 });
 	// The two offer cities framed in the area the turn card leaves open.
 	function pairV() {
 		const [a, b] = [at(offers.A.city), at(offers.B.city)];
@@ -191,7 +203,7 @@
 	// The map's view at story time `time`: the overview while the letterheads take off, then a zoom
 	// in to the pair as they land (scale eases geometrically, so the zoom feels even).
 	// The overview holds until the letterheads are partway across the country.
-	const ZOOM_FROM = T.fly + 0.9;
+	const ZOOM_FROM = T.grow + T.growDur + 0.2;
 	const ZOOM_TO = landed('B') + 0.4;
 	function viewAt(time) {
 		const u = Math.max(0, Math.min(1, (time - ZOOM_FROM) / (ZOOM_TO - ZOOM_FROM)));
@@ -276,9 +288,22 @@
 
 	// Until the turn card is up, the story owns the map: its view follows scroll (overview, then the
 	// zoom in to the pair). Scrolling back above the card takes it back from the reader.
+	// When the reader takes over (even after jumping straight past the zoom, e.g. a fast fling or a
+	// step-dot click), the map starts from the framed view; after that their panning is kept.
+	let handedOver = false;
 	$effect(() => {
 		const time = t;
-		if (!interactive) untrack(() => zoom && cw && sel().interrupt().call(zoom.transform, viewAt(time)));
+		const live = interactive;
+		untrack(() => {
+			if (!zoom || !cw) return;
+			if (!live) {
+				handedOver = false;
+				sel().interrupt().call(zoom.transform, viewAt(time));
+			} else if (!handedOver) {
+				handedOver = true;
+				sel().interrupt().call(zoom.transform, pairView());
+			}
+		});
 	});
 	// The letters split with a CSS transition; follow it with the cursor.
 	$effect(() => {
@@ -289,9 +314,18 @@
 	// ---------- the cursor and the flying letterheads ----------
 	// Elements inside the inbox they aim for, bound from Inbox.
 	let els = $state({ row: {}, lh: {}, sal: {}, reading: null });
+	let searchEl = $state(null);
 	let cur = $state({ x: 0, y: 0, o: 0, press: false });
 	let ripple = $state(null);
 	let chips = $state([]);
+	// The active callout's placement: anchor point (top-center when below its target, bottom-center
+	// when above), its hand-drawn arrows, and its scroll-driven fade/slide.
+	let co = $state(null);
+	// The salary beat's spotlight: everything dims except the two salary lines (and the narration,
+	// drawn above it). { o, holes: [{ x, y, w, h }] } in stage pixels, or null.
+	let spot = $state(null);
+	// The map's result panel, growing out of the search box (a CSS clip-path; 'none' when full).
+	let mapClip = $state('none');
 
 	const ease = d3.easeCubicInOut;
 	const lerp = (a, b, u) => a + (b - a) * u;
@@ -313,6 +347,60 @@
 			return [r.x + r.w * 0.5, r.y + r.h * 0.55];
 		}
 	};
+	// A hand-drawn arrow from s to e: a gentle curve (bend > 0 bows it to the left of its direction)
+	// with an open arrowhead.
+	function arrow([sx0, sy0], [ex, ey], bend = 0.25) {
+		const [dx, dy] = [ex - sx0, ey - sy0];
+		const cx = (sx0 + ex) / 2 + dy * bend;
+		const cy = (sy0 + ey) / 2 - dx * bend;
+		const a = Math.atan2(ey - cy, ex - cx);
+		const h = (da) => [ex - 11 * Math.cos(a + da), ey - 11 * Math.sin(a + da)];
+		const [h1, h2] = [h(0.45), h(-0.45)];
+		return `M${sx0},${sy0} Q${cx},${cy} ${ex},${ey} M${h1[0]},${h1[1]} L${ex},${ey} L${h2[0]},${h2[1]}`;
+	}
+	const CALLOUT_W = 330;
+	// How far each callout box overlaps the start of its arrows.
+	const ARROW_TUCK = 16;
+	// Where each callout sits and what its arrows point at, in stage pixels.
+	function placeCallout(c) {
+		const half = Math.min(CALLOUT_W, cw - 32) / 2;
+		const clampX = (x) => Math.max(16 + half, Math.min(cw - 16 - half, x));
+		if (c.id === 'unread') {
+			// Under the two emails in the list, pointing up at B's red unread dot. When the list spans
+			// the screen above the letter (phones), it drops into the letter's empty lower part.
+			const [a, b] = [rel(els.row.A), rel(els.row.B)];
+			const stacked = a.w > cw * 0.8;
+			const x = clampX(a.x + a.w / 2);
+			const y = stacked ? (() => { const r = rel(els.reading); return r.y + r.h * 0.62; })() : a.y + a.h + 58;
+			return { x, y, place: 'below', arrows: [arrow([x - half * 0.55, y - 6], [b.x + 16, b.y + 36], 0.12)] };
+		}
+		if (c.id === 'salaries') {
+			// Under the two letters, an arrow up to each salary.
+			const [a, b, r] = [rel(els.sal.A), rel(els.sal.B), rel(els.reading)];
+			const x = clampX(r.x + r.w / 2);
+			const y = Math.min(r.y + r.h - 120, Math.max(a.y + a.h, b.y + b.h) + 130);
+			const tip = (q) => [q.x + Math.min(140, q.w * 0.5), q.y + q.h + 4];
+			return {
+				x,
+				y,
+				place: 'below',
+				arrows: [arrow([x - half * 0.45, y - 6], tip(a), 0.2), arrow([x + half * 0.45, y - 6], tip(b), -0.2)]
+			};
+		}
+		if (c.id === 'search') {
+			// Above the taskbar search, pointing down at it.
+			const q = rel(searchEl);
+			const x = clampX(q.x + q.w / 2);
+			const y = q.y - 62;
+			return { x, y, place: 'above', arrows: [arrow([x + 12, y + 6], [q.x + q.w / 2, q.y - 6], 0.15)] };
+		}
+		// 'distance': under the line between the pins, pointing up at its middle.
+		const [mx, my] = link ? [(link[0] + link[2]) / 2, (link[1] + link[3]) / 2] : [cw / 2, ch / 2];
+		const x = clampX(mx);
+		const y = my + 100;
+		return { x, y, place: 'below', arrows: [arrow([x - 10, y - 6], [mx, my + 10], 0.2)] };
+	}
+
 	// Cursor keyframes: [time, where]. Between two different targets it glides; on one it rests.
 	const KEYS = [
 		[T.cursorIn, 'rest'],
@@ -337,7 +425,38 @@
 		const time = t;
 		layoutTick;
 		zt;
-		if (!stage || !els.row.B || !els.lh.A || !els.lh.B) return;
+		if (!stage || !els.row.B || !els.lh.A || !els.lh.B || !searchEl) return;
+
+		// The active callout: placed beside its target, sliding in and out with its stretch of scroll.
+		if (callout) {
+			const u = (time - callout.from) / (callout.to - callout.from);
+			const enter = clamp01(u / 0.1);
+			const exit = clamp01((1 - u) / 0.1);
+			// Each box overlaps the start of its arrows (it's drawn on top of them), so the arrows read
+			// as coming out of the box: boxes below their target move up, boxes above move down.
+			const placed = placeCallout(callout);
+			const y = placed.y + (placed.place === 'below' ? -ARROW_TUCK : ARROW_TUCK);
+			co = { ...placed, y, o: Math.min(enter, exit), dy: (1 - enter) * 14 - (1 - exit) * 14 };
+			// The salary callout also dims the rest of the screen (a local value: reading `co` back
+			// here would make this effect depend on what it just wrote).
+			if (callout.id === 'salaries') {
+				const hole = (el) => {
+					const q = rel(el);
+					return { x: q.x - 8, y: q.y - 7, w: Math.min(q.w, 250) + 16, h: q.h + 14 };
+				};
+				spot = { o: Math.min(enter, exit), holes: [hole(els.sal.A), hole(els.sal.B)] };
+			} else spot = null;
+		} else {
+			co = null;
+			spot = null;
+		}
+
+		// The search result panel grows up out of the search box until it fills the screen.
+		if (time >= T.grow && time < T.grow + T.growDur) {
+			const q = rel(searchEl);
+			const e = 1 - ease(clamp01((time - T.grow) / T.growDur));
+			mapClip = `inset(${(ch - 12) * e}px ${(cw - q.x - q.w) * e}px 0px ${q.x * e}px round ${14 * e}px)`;
+		} else mapClip = 'none';
 
 		const [x, y] = aimAt(time);
 		// In once the scene is set; out as the letters open (the salary markers take over).
@@ -514,8 +633,8 @@
 
 <section class="hook" id="hook" bind:this={sec} style:height="calc(100svh + {SCROLL_VH}vh)">
 <div class="stage" bind:this={stage}>
-	<!-- Act 3: the map, behind the inbox until the letterheads fly to it. -->
-	<div class="map-box" class:shown={mapIn} class:live={interactive} bind:this={box}>
+	<!-- Act 3: the map, the search's result: hidden until it grows out of the taskbar search box. -->
+	<div class="map-box" class:shown={mapIn} class:live={interactive} style:clip-path={mapClip} bind:this={box}>
 		<svg
 			bind:this={svgEl}
 			class="map"
@@ -524,13 +643,6 @@
 			role="img"
 			aria-label="Map of 40 U.S. metros with the two offer cities marked, {offers.A.city} and {offers.B.city}, about {miles} miles apart"
 		>
-			<defs>
-				<!-- Roughens the doodles' lines slightly, like a hand-inked sketch. -->
-				<filter id="hook-sketch" x="-10%" y="-10%" width="120%" height="120%">
-					<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="7" />
-					<feDisplacementMap in="SourceGraphic" scale="1.8" />
-				</filter>
-			</defs>
 			<g transform="translate({zt.x},{zt.y}) scale({zt.k})">
 				{#each paths as s (s.id)}<path class="state" d={s.d} />{/each}
 			</g>
@@ -608,6 +720,16 @@
 	<!-- Acts 1–2: the inbox. -->
 	<div class="window" class:gone={inboxGone}>
 		<Inbox {data} {offers} {split} {readB} {hoverB} {pressB} {hl} {flown} bind:els />
+		<!-- Dims the inbox under the title card, and again while the search types. -->
+		<div class="dim" style:opacity={Math.max(titleO, searchDim) * DIM}></div>
+	</div>
+
+	<!-- The computer's taskbar, always along the bottom. -->
+	<div class="taskbar-wrap">
+		<Taskbar {query} focus={searching} bind:searchEl />
+		<!-- Under the title card the taskbar dims too (the focus is the narration); during the
+		     search it stays bright, since the search box is the focus. -->
+		<div class="dim" style:opacity={titleO * DIM}></div>
 	</div>
 
 	<!-- The letterheads in flight. -->
@@ -627,8 +749,13 @@
 
 	<!-- The story's cursor: bigger than a real one, so it reads as the narrator's, not the reader's. -->
 	<div class="cursor" class:press={cur.press} aria-hidden="true" style:transform="translate({cur.x}px, {cur.y}px)" style:opacity={cur.o}>
-		<svg viewBox="0 0 28 40" width="34" height="48">
-			<path d="M2 2 L2 31 L9.5 24.5 L14.5 36 L19.5 33.8 L14.6 22.6 L24.5 22.6 Z" />
+		<svg viewBox="-2 -2 34 46" width="54" height="73">
+			<!-- Hand-drawn: a slightly uneven arrow in ink over white with a flat offset shadow,
+			     roughened by the shared `doodle` filter like the rest of the hook. -->
+			<g class="c-ink">
+				<path class="c-shadow" d="M5 5 L5.4 34 L12.6 27.4 L17.8 39 L22.6 36.6 L17.6 25.6 L27.6 25.2 Z" />
+				<path class="c-body" d="M2 2 L2.3 31 L9.6 24.4 L14.6 36.2 L19.6 33.8 L14.6 22.7 L24.6 22.3 Z" />
+			</g>
 		</svg>
 	</div>
 	{#if ripple}
@@ -637,6 +764,7 @@
 
 	<!-- Act 3's turn card, at the end of the scroll. -->
 	<div class="turn" class:shown={showCard} inert={!showCard}>
+		<SketchBox r={18} seed={BOX_SEED} shadow="var(--grid)" />
 		<p class="prose">Salary is only one part of the story. Also weigh:</p>
 		<ul class="factors">
 			<li><strong>what’s left over</strong> after living expenses</li>
@@ -647,12 +775,45 @@
 		<p class="next">Scroll to find out <span aria-hidden="true">↓</span></p>
 	</div>
 
-	<!-- Narration. -->
-	<div class="caption-wrap" aria-live="polite">
-		{#if caption}
-			<p class="caption" style:opacity={capMotion.o} style:transform="translateY({capMotion.y}px)">
-				{#if caption.beat}<span class="beat">{caption.beat}</span>{/if}
-				{caption.text}
+	<!-- The salary beat's spotlight: the screen dims around the two salary lines. -->
+	{#if spot}
+		<svg class="spot" aria-hidden="true" style:opacity={spot.o}>
+			<defs>
+				<mask id="hook-spot">
+					<rect width="100%" height="100%" fill="#fff" />
+					{#each spot.holes as r, i (i)}<rect x={r.x} y={r.y} width={r.w} height={r.h} rx="10" fill="#000" />{/each}
+				</mask>
+			</defs>
+			<rect class="spot-dim" width="100%" height="100%" mask="url(#hook-spot)" style:opacity={DIM} />
+		</svg>
+	{/if}
+
+	<!-- Narration: the opening title card, then one callout at a time beside the action. -->
+	<div class="title-card" style:opacity={titleO} aria-hidden={titleO < 0.5}>
+		<!-- Styled like the turn card: ink outline, gray shadow. -->
+		<SketchBox r={18} seed={BOX_SEED} shadow="var(--grid)" />
+		<p class="beat">Imagine this</p>
+		<p class="title-text">
+			You're about to graduate, and two entry-level offers in {fieldTxt} just landed in your inbox.
+		</p>
+		<p class="title-hint">Scroll to follow the story <span aria-hidden="true">↓</span></p>
+	</div>
+	{#if co}
+		<svg class="arrows" width={cw} height="100%" aria-hidden="true" style:opacity={co.o}>
+			{#each co.arrows as d, i (i)}<path {d} />{/each}
+		</svg>
+	{/if}
+	<div class="callout-live" aria-live="polite">
+		{#if co && callout}
+			<p
+				class="callout {co.place}"
+				style:left="{co.x}px"
+				style:top="{co.y}px"
+				style:opacity={co.o}
+				style:--dy="{co.dy}px"
+			>
+				<SketchBox r={24} seed={BOX_SEED} ink="var(--accent)" shadow="var(--accent-soft)" />
+				{callout.text}
 			</p>
 		{/if}
 	</div>
@@ -667,6 +828,11 @@
 		background: var(--page);
 	}
 	.stage {
+		/* The taskbar: its height, and its gap from the bottom (room for the story's step dots
+		   below 1240px). Everything else sits above it. */
+		--tb-h: 48px;
+		--tb-bottom: 0px;
+		--tb-space: calc(var(--tb-h) + var(--tb-bottom));
 		position: sticky;
 		top: 0;
 		height: 100vh;
@@ -674,14 +840,24 @@
 		min-height: 560px;
 		overflow: hidden;
 	}
+	.taskbar-wrap {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: var(--tb-bottom);
+		height: var(--tb-h);
+		z-index: 5;
+	}
 
 	/* ---------- map ---------- */
 	.map-box {
 		position: absolute;
-		inset: 0;
+		inset: 0 0 var(--tb-space) 0;
+		z-index: 2;
 		opacity: 0;
 		pointer-events: none;
-		transition: opacity 700ms ease-out;
+		/* Solid, so the result panel covers the inbox as it grows. */
+		background: var(--page);
 	}
 	.map-box.shown {
 		opacity: 1;
@@ -795,7 +971,7 @@
 		stroke: none;
 	}
 	.ink-wobble {
-		filter: url(#hook-sketch);
+		filter: url(#doodle);
 	}
 	.known :global(:is(.f, .l, .ink, .inkf, .hls)) {
 		stroke: var(--ink);
@@ -889,18 +1065,23 @@
 	/* ---------- inbox: fills the screen ---------- */
 	.window {
 		position: absolute;
+		inset: 0 0 var(--tb-space) 0;
+		z-index: 1;
+		transition: opacity 400ms ease-in;
+	}
+	.dim {
+		position: absolute;
 		inset: 0;
-		transition: opacity 800ms ease-in;
+		background: var(--page);
+		pointer-events: none;
 	}
 	.window :global(.mail) {
 		border: 0;
 		border-radius: 0;
 		box-shadow: none;
 	}
-	/* Room under the letters for the narration, and on the right for the story's step dots
-	   (a right-edge rail at 1240px and up). */
+	/* Room on the right for the story's step dots (a right-edge rail at 1240px and up). */
 	.window :global(.reading) {
-		padding-bottom: 130px;
 		padding-right: 56px;
 	}
 	.window.gone {
@@ -916,6 +1097,8 @@
 		z-index: 4;
 		overflow: hidden;
 		pointer-events: none;
+		/* Styled like the inbox letterhead it lifts off from, filling with the pin's color as it
+		   shrinks into the pin. */
 		background: color-mix(in srgb, var(--a) 12%, var(--surface));
 		border: 1px solid color-mix(in srgb, var(--a) 35%, transparent);
 		box-shadow: 0 8px 24px rgba(20, 30, 45, 0.18);
@@ -954,23 +1137,31 @@
 		top: 0;
 		z-index: 6;
 		pointer-events: none;
-		filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.3));
 	}
+	/* The arrow's tip sits at (2, 2) in its drawing, about 6.4px into the 54px-wide svg: pull the
+	   svg back so the tip lands on the point being clicked, and press from the tip. */
 	.cursor svg {
 		display: block;
-		transform-origin: 2px 2px;
+		margin: -6.4px 0 0 -6.4px;
+		transform-origin: 6.4px 6.4px;
 		transition: transform 90ms;
 	}
 	.cursor.press svg {
 		transform: scale(0.84);
 	}
-	.cursor path {
-		fill: #fff;
-		stroke: var(--ink);
-		stroke-width: 2;
+	.c-ink {
+		filter: url(#doodle);
+	}
+	.c-body {
+		fill: #fffefa;
+		stroke: #23211e;
+		stroke-width: 2.4;
 		stroke-linejoin: round;
 	}
-	/* The click: a filled pulse at the cursor tip with a ring spreading out from it. */
+	.c-shadow {
+		fill: rgba(35, 33, 30, 0.28);
+	}
+	/* The click: a hand-drawn pulse at the cursor tip with a ring spreading out from it. */
 	.ripple {
 		position: absolute;
 		z-index: 5;
@@ -978,8 +1169,9 @@
 		height: 64px;
 		margin: -32px 0 0 -32px;
 		border-radius: 50%;
-		border: 4px solid var(--b);
-		background: color-mix(in srgb, var(--b) 22%, transparent);
+		border: 3px solid var(--b);
+		background: color-mix(in srgb, var(--b) 18%, transparent);
+		filter: url(#doodle);
 		pointer-events: none;
 		transform: scale(calc(0.35 + var(--u) * 1.1));
 		opacity: calc(1 - var(--u) * var(--u));
@@ -993,10 +1185,8 @@
 		z-index: 3;
 		width: 360px;
 		padding: 16px 18px;
-		background: color-mix(in srgb, var(--surface) 95%, transparent);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+		/* A sketched box (SketchBox) behind the text: pen-drawn outline, soft gray shadow. */
+		isolation: isolate;
 		opacity: 0;
 		transform: translateY(calc(-50% + 16px));
 		transition:
@@ -1038,42 +1228,96 @@
 		color: var(--accent);
 	}
 
-	/* ---------- narration ---------- */
-	.caption-wrap {
+	/* ---------- the salary spotlight ---------- */
+	/* Over the inbox and taskbar, under the narration and its arrows. */
+	.spot {
 		position: absolute;
-		left: 50%;
-		bottom: 28px;
-		z-index: 7;
-		width: min(760px, calc(100% - 32px));
-		transform: translateX(-50%);
-		display: flex;
-		justify-content: center;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 6;
 		pointer-events: none;
 	}
-	.caption {
-		margin: 0;
-		padding: 10px 18px;
-		border-radius: 10px;
-		background: color-mix(in srgb, var(--hero-bg) 94%, transparent);
-		color: var(--hero-ink);
-		font-size: 17px;
-		line-height: 1.4;
+	.spot-dim {
+		fill: var(--page);
+	}
+
+	/* ---------- narration ---------- */
+	/* The opening title card, centered over the dimmed inbox. */
+	.title-card {
+		position: absolute;
+		left: 50%;
+		top: 44%;
+		z-index: 8;
+		width: min(620px, calc(100% - 40px));
+		transform: translate(-50%, -50%);
+		padding: 32px 40px 26px;
+		/* A sketched box (SketchBox) behind the text, like the turn card: ink outline, gray shadow. */
+		isolation: isolate;
+		pointer-events: none;
 		text-align: center;
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 	}
-	.caption .beat {
-		display: block;
-		margin: 0 0 2px;
-		color: var(--accent-soft);
+	.title-card .beat {
+		font-size: 13px;
+		margin-bottom: 10px;
 	}
-	/* Below 1240px the story's step dots become a pill at the bottom center: lift the narration
+	.title-text {
+		margin: 0;
+		font-size: 26px;
+		line-height: 1.3;
+		font-weight: 650;
+		letter-spacing: -0.01em;
+		color: var(--ink);
+	}
+	.title-hint {
+		margin: 16px 0 0;
+		font-size: 13px;
+		color: var(--muted);
+	}
+	/* Callouts: a short line beside the action, with hand-drawn arrows to what it's about. */
+	.arrows {
+		position: absolute;
+		left: 0;
+		top: 0;
+		z-index: 7;
+		overflow: visible;
+		pointer-events: none;
+	}
+	.arrows path {
+		fill: none;
+		stroke: var(--accent);
+		stroke-width: 2.4;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		filter: url(#doodle);
+	}
+	.callout {
+		position: absolute;
+		z-index: 7;
+		width: max-content;
+		max-width: min(330px, calc(100vw - 32px));
+		margin: 0;
+		padding: 14px 22px;
+		/* A sketched box (SketchBox) behind the text, pen-drawn in the arrows' accent with a soft
+		   accent shadow. The arrows do the pointing, so no tail. */
+		isolation: isolate;
+		font-size: 16px;
+		line-height: 1.4;
+		font-weight: 550;
+		color: var(--ink);
+		pointer-events: none;
+		transform: translate(-50%, var(--dy));
+	}
+	.callout.above {
+		transform: translate(-50%, calc(-100% + var(--dy)));
+	}
+	/* Below 1240px the story's step dots become a pill at the bottom center: lift the taskbar
 	   above it. */
 	@media (max-width: 1239px) {
-		.caption-wrap {
-			bottom: 64px;
+		.stage {
+			--tb-bottom: 58px;
 		}
 		.window :global(.reading) {
-			padding-bottom: 170px;
 			padding-right: 14px;
 		}
 	}
@@ -1082,7 +1326,7 @@
 	@media (max-width: 1099px) {
 		.turn {
 			top: auto;
-			bottom: 64px;
+			bottom: calc(var(--tb-space) + 12px);
 			left: 16px;
 			right: 16px;
 			width: auto;
@@ -1100,7 +1344,10 @@
 		.zoom .hint {
 			display: none;
 		}
-		.caption {
+		.title-text {
+			font-size: 21px;
+		}
+		.callout {
 			font-size: 15px;
 		}
 	}

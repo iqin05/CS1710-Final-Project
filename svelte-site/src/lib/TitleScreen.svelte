@@ -165,21 +165,21 @@
 	let cueOut = $derived(clamp01(progress / 0.05));
 </script>
 
-<!-- A strapped bundle of $100 bills, front bill facing out, drawn in grays only (no real artwork):
-     two offset edges for the stack, the frame, corner "100"s, a seal, an oval portrait, and the
-     paper strap. Fifty $100s in a strap is $5,000, which is what each bundle stands for. -->
+<!-- A strapped bundle of bills, hand-drawn in the hook's doodle style (dark ink outlines, flat
+     fills, a highlight, small ink ticks; no real banknote artwork): two offset edges for the stack,
+     a slightly crooked front bill with a "$" medallion, and the paper strap. Each bundle stands for
+     $5,000. The whole pile is roughened by the shared `doodle` filter. -->
 {#snippet bundle()}
-	<rect class="edge-bill" x="2.4" y="2.4" width={BW} height={BH} rx="1" />
-	<rect class="edge-bill" x="1.2" y="1.2" width={BW} height={BH} rx="1" />
-	<rect class="bill" width={BW} height={BH} rx="1" />
-	<rect class="frame" x="1.6" y="1.6" width={BW - 3.2} height={BH - 3.2} rx="0.6" />
-	<text class="denom" x="3" y="5.4">100</text>
-	<text class="denom big" x={BW - 3} y={BH - 2.6} text-anchor="end">100</text>
-	<circle class="seal" cx="32" cy="6.4" r="1.9" />
-	<ellipse class="oval" cx="22.5" cy="8.5" rx="4.4" ry="5.7" />
-	<circle class="portrait" cx="22.5" cy="7.2" r="1.8" />
-	<path class="portrait" d="M19.2 13.1 q3.3 -4.4 6.6 0 z" />
-	<rect class="strap" x="10" y="-0.6" width="4.2" height={BH + 1.2} />
+	<path class="m-edge" d="M3 3.2 L42.2 2.8 L42.4 19.6 L3.2 20 Z" />
+	<path class="m-edge" d="M1.6 1.8 L41 1.4 L41.2 18.4 L1.8 18.6 Z" />
+	<path class="m-bill" d="M0.2 0.4 L39.8 0 L40 16.8 L0 17.2 Z" />
+	<path class="m-hl" d="M2.2 2.6 L2.4 14.6" />
+	<path class="m-frame" d="M2.6 2.4 L37.4 2.1 L37.6 14.8 L2.6 15 Z" />
+	<ellipse class="m-oval" cx="25" cy="8.6" rx="5.2" ry="5.8" />
+	<text class="m-sign" x="25" y="11.6" text-anchor="middle">$</text>
+	<path class="m-tick" d="M4.6 5.2h3.4M32.2 12.6h3.2M33 5h2" />
+	<path class="m-strap" d="M9.6 -0.9 L14.8 -0.7 L14.6 17.9 L9.4 18.1 Z" />
+	<path class="m-tick" d="M10.8 6.4h2.6M10.8 10.4h2.6" />
 {/snippet}
 
 <header class="title-screen" bind:this={el}>
@@ -192,6 +192,7 @@
 						role="img"
 						aria-label="Offer {p.key}: {f$(p.salary)} a year, drawn as {p.n} bundles of {f$(SALARY_STEP)}. As you scroll, bundles go to taxes, rent and everyday costs."
 					>
+						<g class="money">
 						{#each p.bundles as b (b.i)}
 							{@const s = look(p, b)}
 							<g
@@ -201,6 +202,7 @@
 								<g style:transform={s.transform} style:opacity={s.opacity}>{@render bundle()}</g>
 							</g>
 						{/each}
+						</g>
 					</svg>
 					<!-- Where the money goes. -->
 					<ul class="cats" style:opacity={labelsIn} aria-hidden="true">
@@ -331,44 +333,56 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* The $100 bundle, in the page's grays. */
-	.bill,
-	.edge-bill {
-		fill: var(--mid);
-		stroke: var(--muted);
-		stroke-width: 0.7;
+	/* The doodled bundle: ink outlines over flat blue-green bills with an amber strap. Chosen to hold
+	   up under red-green color blindness: a green bill and a cream strap become nearly the same color
+	   under protanopia (ΔE ≈ 3), while blue-green against amber sits on the blue-yellow axis those
+	   viewers still see (ΔE ≈ 64 under protanopia and deuteranopia). */
+	.money {
+		filter: url(#doodle);
 	}
-	.edge-bill {
-		fill: var(--grid);
-		stroke: var(--axis);
+	.m-edge,
+	.m-bill,
+	.m-oval,
+	.m-strap {
+		stroke: #23211e;
+		stroke-width: 1;
+		stroke-linejoin: round;
 	}
-	.frame,
-	.oval,
-	.seal {
+	.m-edge {
+		fill: #6fa8a1;
+	}
+	.m-bill {
+		fill: #c6e3e0;
+	}
+	.m-hl {
 		fill: none;
-		stroke: var(--axis);
-		stroke-width: 0.5;
+		stroke: #eaf6f4;
+		stroke-width: 1.4;
+		stroke-linecap: round;
 	}
-	.oval {
-		stroke: var(--muted);
-		stroke-width: 0.6;
+	.m-frame {
+		fill: none;
+		stroke: #23211e;
+		stroke-width: 0.45;
+		stroke-opacity: 0.45;
 	}
-	.portrait {
-		fill: var(--axis);
+	.m-oval {
+		fill: #e4f2f0;
+		stroke-width: 0.8;
 	}
-	.denom {
-		font-size: 3.6px;
-		font-weight: 700;
-		fill: var(--muted);
-		letter-spacing: -0.02em;
+	.m-sign {
+		font-size: 8.4px;
+		font-weight: 800;
+		fill: #23211e;
 	}
-	.denom.big {
-		font-size: 4.6px;
+	.m-tick {
+		fill: none;
+		stroke: #23211e;
+		stroke-width: 0.7;
+		stroke-linecap: round;
 	}
-	.strap {
-		fill: var(--axis);
-		stroke: var(--muted);
-		stroke-width: 0.4;
+	.m-strap {
+		fill: #e9b949;
 	}
 	.bundle > g {
 		transform-box: fill-box;

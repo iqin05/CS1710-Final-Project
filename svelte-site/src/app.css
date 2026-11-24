@@ -28,6 +28,14 @@
 * {
 	box-sizing: border-box;
 }
+
+/* Holds the shared hand-drawn SVG filters (+layout.svelte) without taking up space. */
+.doodle-defs {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+}
 html {
 	scroll-behavior: smooth;
 }

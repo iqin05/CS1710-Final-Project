@@ -2,12 +2,12 @@
 	import { ALL, f$ } from '#lib/data.js';
 
 	// HOOK, act 1: the reader's inbox, a generic three-pane mail client (folders, message list,
-	// reading pane). Offer A's email is already open; Offer B's sits unread with a pulsing red dot.
+	// reading pane). Offer A's email is already open; Offer B's sits unread with a pulsing money-green unread dot.
 	// Purely presentational: the hook's timeline drives every state below, and a scripted cursor
 	// "uses" it, so the whole window is hidden from assistive tech and can't be focused (the hook's
 	// captions carry the narration).
 	//   split   Offer B's email has been opened: the reading pane shows both letters side by side
-	//   readB   Offer B's red dot is gone
+	//   readB   Offer B's unread dot is gone
 	//   hoverB / pressB   the cursor is over / clicking Offer B's row
 	//   hl      { A, B }: a marker swipe across that letter's salary line
 	//   flown   { A, B }: that letter's letterhead has left for the map (the hook draws the flying copy)
@@ -94,9 +94,9 @@
 					<dd><mark>{f$(o.salary)} per year</mark></dd>
 				</div>
 				<div><dt>Location</dt><dd>{place(o)}</dd></div>
-				<div><dt>Start date</dt><dd>July 6, 2027</dd></div>
+				<div><dt>Start date</dt><dd>June 21, 2027</dd></div>
 			</dl>
-			<p class="small">Please reply by April 30, 2027.</p>
+			<p class="small">Please reply by May 30, 2027.</p>
 			<p class="small sig">Best regards,<br />Human Resources<br />{company(o)}</p>
 		</div>
 	</article>
@@ -107,12 +107,23 @@
 		{@render icon('grid')}
 		<span class="brand">{@render icon('mail')} Mail</span>
 		<span class="search">{@render icon('search')} Search mail</span>
-		<span class="me">YOU</span>
+		<span class="me">
+			<span class="me-txt">YOU</span>
+			<!-- The reader: a minimal graduate silhouette (head, shoulders, mortarboard and tassel). -->
+			<span class="me-av">
+				<svg viewBox="0 0 24 24" aria-hidden="true">
+					<circle class="grad" cx="12" cy="12.6" r="3.7" />
+					<path class="grad" d="M4.6 24c0-4.4 3.3-7.4 7.4-7.4s7.4 3 7.4 7.4z" />
+					<path class="grad cap" d="M2.6 7.6 12 3.8l9.4 3.8L12 11.4z" />
+					<path class="tassel" d="M19.2 8.6v4.6" />
+				</svg>
+			</span>
+		</span>
 	</div>
 
 	<div class="panes" class:split>
 		<nav class="folders">
-			<span class="new">{@render icon('drafts')} New message</span>
+			<span class="folder">{@render icon('drafts')} New message</span>
 			<span class="folder on">{@render icon('inbox')} Inbox {#if !readB}<em>1</em>{/if}</span>
 			<span class="folder">{@render icon('drafts')} Drafts</span>
 			<span class="folder">{@render icon('sent')} Sent</span>
@@ -137,7 +148,8 @@
 
 <style>
 	.mail {
-		--mail-bar: #24364f;
+		/* The same black as the taskbar (Taskbar.svelte), for the title bar. */
+		--mail-bar: #111;
 		--mail-ink: #f4f1ea;
 		height: 100%;
 		display: flex;
@@ -195,16 +207,42 @@
 		background: rgba(255, 255, 255, 0.92);
 		color: var(--muted);
 	}
+	/* The reader's account: "You" beside a round avatar holding the graduate silhouette. */
 	.me {
 		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.me-av {
 		width: 30px;
 		height: 30px;
 		border-radius: 50%;
 		display: grid;
-		place-items: center;
-		font-size: 9px;
-		font-weight: 700;
+		place-items: end center;
+		overflow: hidden;
 		background: rgba(255, 255, 255, 0.18);
+	}
+	.me-av svg {
+		width: 24px;
+		height: 24px;
+	}
+	.me-av .grad {
+		fill: var(--mail-ink);
+	}
+	/* A thin line in the bar's color separates the cap from the head. */
+	.me-av .cap {
+		stroke: var(--mail-bar);
+		stroke-width: 1;
+		stroke-linejoin: round;
+	}
+	.me-av .tassel {
+		fill: none;
+		stroke: var(--mail-ink);
+		stroke-width: 1.3;
+		stroke-linecap: round;
 	}
 
 	/* Three panes */
@@ -221,18 +259,8 @@
 		padding: 12px 10px;
 		border-right: 1px solid var(--grid);
 		background: var(--page);
-		color: var(--ink-2);
-	}
-	.new {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin-bottom: 10px;
-		padding: 8px 10px;
-		border-radius: 8px;
-		background: var(--mail-bar);
-		color: var(--mail-ink);
-		font-weight: 600;
+		/* Every folder and action in black ink; the open one is also bold. */
+		color: var(--ink);
 	}
 	.folder {
 		display: flex;
@@ -241,16 +269,15 @@
 		padding: 6px 10px;
 		border-radius: 6px;
 	}
+	/* The open folder: bold text (and its unread count), no highlight box or border. */
 	.folder.on {
-		background: color-mix(in srgb, var(--a) 14%, transparent);
-		color: var(--ink);
-		font-weight: 650;
+		font-weight: 700;
 	}
 	.folder em {
 		margin-left: auto;
 		font-style: normal;
 		font-weight: 700;
-		color: var(--neg);
+		color: inherit;
 	}
 
 	.list {
@@ -269,7 +296,8 @@
 		padding: 8px 12px 4px;
 		font-size: 12px;
 		font-weight: 650;
-		color: var(--ink-2);
+		/* The "Unread" and "Today" group labels, in black ink like the emails. */
+		color: var(--ink);
 	}
 	.group .ico {
 		width: 12px;
@@ -308,7 +336,7 @@
 		font-weight: 700;
 		color: var(--ink);
 	}
-	/* The unread marker: a red dot that pulses until the email is opened. */
+	/* The unread marker: a money-green dot that pulses until the email is opened. */
 	.dot {
 		width: 10px;
 		height: 10px;
@@ -316,16 +344,17 @@
 		border-radius: 50%;
 		background: transparent;
 	}
+	/* The pulsing unread dot leads the story, so it's in the narration color, not red. */
 	.dot.on {
-		background: var(--neg);
+		background: var(--accent);
 		animation: pulse 1.4s ease-out infinite;
 	}
 	@keyframes pulse {
 		0% {
-			box-shadow: 0 0 0 0 color-mix(in srgb, var(--neg) 60%, transparent);
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
 		}
 		100% {
-			box-shadow: 0 0 0 9px color-mix(in srgb, var(--neg) 0%, transparent);
+			box-shadow: 0 0 0 9px color-mix(in srgb, var(--accent) 0%, transparent);
 		}
 	}
 	.av {
@@ -336,6 +365,7 @@
 		place-items: center;
 		font-size: 11px;
 		font-weight: 700;
+		/* White reads well on both offer colors (8.1:1 on New York's pink, 5.3:1 on Detroit's blue). */
 		color: #fff;
 		background: var(--a);
 	}
@@ -368,12 +398,13 @@
 		font-size: 11px;
 		color: var(--muted);
 	}
+	/* Email text in black ink; only the time stamps stay muted. */
 	.subj {
-		color: var(--ink-2);
+		color: var(--ink);
 	}
 	.prev {
 		font-size: 12px;
-		color: var(--muted);
+		color: var(--ink);
 	}
 
 	/* Reading pane: one letter, then both side by side once Offer B is opened. */
@@ -459,7 +490,7 @@
 	}
 	.lh-txt span {
 		font-size: 12px;
-		color: var(--ink-2);
+		color: var(--ink);
 	}
 	.l-subj {
 		font-size: 17px;
@@ -494,9 +525,10 @@
 		gap: 8px;
 		color: var(--muted);
 	}
+	/* The letter text in black ink ("to me" and the time above stay muted). */
 	.body p {
 		margin: 10px 0;
-		color: var(--ink-2);
+		color: var(--ink);
 	}
 	.body b {
 		color: var(--ink);
@@ -505,11 +537,13 @@
 	.small {
 		font-size: 12px;
 	}
+	/* The offer terms: a cream box with a slight border so it stands out from the white letter. */
 	.terms {
 		margin: 12px 0;
 		padding: 8px 12px;
 		border-radius: 8px;
 		background: var(--page);
+		border: 1px solid var(--axis);
 	}
 	.terms div {
 		display: flex;
@@ -519,7 +553,7 @@
 	.terms dt {
 		width: 70px;
 		flex: none;
-		color: var(--muted);
+		color: var(--ink);
 	}
 	.terms dd {
 		margin: 0;

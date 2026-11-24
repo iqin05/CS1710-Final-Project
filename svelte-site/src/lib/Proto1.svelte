@@ -79,7 +79,7 @@
 			]
 		});
 	}
-	// Offer cities in their offer colors (A blue, B orange, as everywhere in the story); a clicked city
+	// Offer cities in their offer colors (A pink, B blue, as everywhere in the story); a clicked city
 	// gets a dark ring.
 	const markClass = (d) =>
 		[d.city === offers.A.city ? 'oa' : d.city === offers.B.city ? 'ob' : '', d.city === sel ? 'picked' : ''].join(' ');

@@ -13,8 +13,8 @@
 	// HOOK: scrollytelling on "your computer": a full-screen inbox above an always-visible taskbar
 	// (its clock set to graduation season). The screen stays pinned while the reader scrolls.
 	// Narration: an "Imagine this" title card over the dimmed inbox opens the story; after that,
-	// each line is a callout beside what it's about, with a hand-drawn arrow pointing at it.
-	//   act 1, inbox:  Offer A's email is open; Offer B's sits unread with a pulsing red dot. An
+	// each line is a callout box beside what it's about.
+	//   act 1, inbox:  Offer A's email is open; Offer B's sits unread with a pulsing money-green unread dot. An
 	//                  enlarged cursor (the story's, not the reader's) clicks it, the two offer
 	//                  letters open side by side, and the cursor leaves.
 	//   act 2, salary: the bigger paycheck catches your eye: both salary lines are marked.
@@ -62,6 +62,11 @@
 	const VH_PER_S = 38;
 	const HOLD = 3;
 	const SCROLL_VH = (T.end + HOLD) * VH_PER_S;
+	// The story's < > buttons (Scrolly.svelte) step between these moments, each one a new thing on
+	// screen: the title card, the unread email, the salary spotlight, the typed search, the map's
+	// distance, and the turn card. Marked as invisible [data-stop] spots at the matching scroll.
+	const STOPS = [0, 3.6, 8.6, 13.9, 18.5, T.end];
+	const stopTop = (time) => `${(time / (T.end + HOLD)) * SCROLL_VH}vh`;
 
 	let t = $state(0);
 	let reduced = false;
@@ -151,11 +156,16 @@
 	// Projected once into a fixed base space; zooming transforms that space onto the screen.
 	const BASE_W = 960;
 	const BASE_H = 600;
-	const { projection, paths, outline } = usMap(BASE_W, BASE_H);
+	const { projection, paths, outline, labels: stateLabels } = usMap(BASE_W, BASE_H);
 
 	// Every metro at its typical entry-level salary in the story's field (shown on hover).
 	let points = $derived(metrosInField(data, offers.A.field).map((c) => ({ ...c, p: projection([c.lon, c.lat]) })));
 	const at = (city) => points.find((d) => d.city === city).p;
+	// The two offer cities' states, which get their names on the map.
+	let offerStates = $derived.by(() => {
+		const st = new Set([offers.A.city, offers.B.city].map((c) => data.byCity[c].state));
+		return stateLabels.filter((s) => st.has(s.abbr));
+	});
 
 	let stage;
 	let box;
@@ -319,7 +329,7 @@
 	let ripple = $state(null);
 	let chips = $state([]);
 	// The active callout's placement: anchor point (top-center when below its target, bottom-center
-	// when above), its hand-drawn arrows, and its scroll-driven fade/slide.
+	// when above) and its scroll-driven fade/slide.
 	let co = $state(null);
 	// The salary beat's spotlight: everything dims except the two salary lines (and the narration,
 	// drawn above it). { o, holes: [{ x, y, w, h }] } in stage pixels, or null.
@@ -347,27 +357,17 @@
 			return [r.x + r.w * 0.5, r.y + r.h * 0.55];
 		}
 	};
-	// A hand-drawn arrow from s to e: a gentle curve (bend > 0 bows it to the left of its direction)
-	// with an open arrowhead.
-	function arrow([sx0, sy0], [ex, ey], bend = 0.25) {
-		const [dx, dy] = [ex - sx0, ey - sy0];
-		const cx = (sx0 + ex) / 2 + dy * bend;
-		const cy = (sy0 + ey) / 2 - dx * bend;
-		const a = Math.atan2(ey - cy, ex - cx);
-		const h = (da) => [ex - 11 * Math.cos(a + da), ey - 11 * Math.sin(a + da)];
-		const [h1, h2] = [h(0.45), h(-0.45)];
-		return `M${sx0},${sy0} Q${cx},${cy} ${ex},${ey} M${h1[0]},${h1[1]} L${ex},${ey} L${h2[0]},${h2[1]}`;
-	}
 	const CALLOUT_W = 380;
-	// How far each callout box overlaps the start of its arrows.
-	const ARROW_TUCK = 16;
-	// Where each callout sits and what its arrows point at, in stage pixels.
+	// Pulls each callout box this far toward what it's about (up when below it, down when above).
+	const NUDGE = 16;
+	// Where each callout sits, in stage pixels. No arrows: the visual cues (the unread dot, the
+	// salary spotlight, the typed search, the dotted line) already point the way.
 	function placeCallout(c) {
 		const half = Math.min(CALLOUT_W, cw - 32) / 2;
 		const clampX = (x) => Math.max(16 + half, Math.min(cw - 16 - half, x));
 		if (c.id === 'unread') {
-			// Under the two emails in the list, pointing up at B's red unread dot. When the list spans
-			// the screen above the letter (phones), it drops into the letter's empty lower part.
+			// Under the two emails in the list, near B's unread dot. When the list spans the screen
+			// above the letter (phones), it drops into the letter's empty lower part.
 			const [a, b] = [rel(els.row.A), rel(els.row.B)];
 			const stacked = a.w > cw * 0.8;
 			// Right-aligned with the list (when it sits beside the letter), so a box wider than the
@@ -378,33 +378,29 @@
 			const r = rel(els.reading);
 			const overLetter = stacked || x + half > r.x + 12;
 			const y = overLetter ? r.y + r.h * 0.62 : a.y + a.h + 58;
-			return { x, y, place: 'below', arrows: [arrow([x - half * 0.55, y - 6], [b.x + 16, b.y + 36], 0.12)] };
+			return { x, y, place: 'below' };
 		}
 		if (c.id === 'salaries') {
-			// Under the two letters, an arrow up to each salary.
+			// Just under the two spotlit salaries, centered between them (each spotlight hole is the
+			// salary line's first 250 px at most, so center on those, not on the whole letters).
 			const [a, b, r] = [rel(els.sal.A), rel(els.sal.B), rel(els.reading)];
-			const x = clampX(r.x + r.w / 2);
-			const y = Math.min(r.y + r.h - 120, Math.max(a.y + a.h, b.y + b.h) + 130);
-			const tip = (q) => [q.x + Math.min(140, q.w * 0.5), q.y + q.h + 4];
-			return {
-				x,
-				y,
-				place: 'below',
-				arrows: [arrow([x - half * 0.45, y - 6], tip(a), 0.2), arrow([x + half * 0.45, y - 6], tip(b), -0.2)]
-			};
+			const mid = (q) => q.x + Math.min(q.w, 250) / 2;
+			const x = clampX((mid(a) + mid(b)) / 2);
+			const y = Math.min(r.y + r.h - 120, Math.max(a.y + a.h, b.y + b.h) + 40);
+			return { x, y, place: 'below' };
 		}
 		if (c.id === 'search') {
-			// Above the taskbar search, pointing down at it.
+			// Above the taskbar search.
 			const q = rel(searchEl);
 			const x = clampX(q.x + q.w / 2);
 			const y = q.y - 62;
-			return { x, y, place: 'above', arrows: [arrow([x + 12, y + 6], [q.x + q.w / 2, q.y - 6], 0.15)] };
+			return { x, y, place: 'above' };
 		}
-		// 'distance': under the line between the pins, pointing up at its middle.
+		// 'distance': under the line between the pins.
 		const [mx, my] = link ? [(link[0] + link[2]) / 2, (link[1] + link[3]) / 2] : [cw / 2, ch / 2];
 		const x = clampX(mx);
 		const y = my + 100;
-		return { x, y, place: 'below', arrows: [arrow([x - 10, y - 6], [mx, my + 10], 0.2)] };
+		return { x, y, place: 'below' };
 	}
 
 	// Cursor keyframes: [time, where]. Between two different targets it glides; on one it rests.
@@ -438,10 +434,9 @@
 			const u = (time - callout.from) / (callout.to - callout.from);
 			const enter = clamp01(u / 0.1);
 			const exit = clamp01((1 - u) / 0.1);
-			// Each box overlaps the start of its arrows (it's drawn on top of them), so the arrows read
-			// as coming out of the box: boxes below their target move up, boxes above move down.
+			// Boxes below their target move up a little, boxes above move down.
 			const placed = placeCallout(callout);
-			const y = placed.y + (placed.place === 'below' ? -ARROW_TUCK : ARROW_TUCK);
+			const y = placed.y + (placed.place === 'below' ? -NUDGE : NUDGE);
 			co = { ...placed, y, o: Math.min(enter, exit), dy: (1 - enter) * 14 - (1 - exit) * 14 };
 			// The salary callout also dims the rest of the screen (a local value: reading `co` back
 			// here would make this effect depend on what it just wrote).
@@ -520,9 +515,13 @@
 			{ key: 'waves', label: 'The Great Lakes' }
 		]
 	};
-	// Doodles sit on a ring around the pin, leaving a gap on the side its label is on.
+	// Doodles sit on an arc around the pin. Spread apart, the two arcs bracket the pair like
+	// parentheses, ( A ——— B ): the western pin's arc on its left, the eastern pin's on its right.
 	const RING = 60;
-	function ringAngles(k, flip, close, west) {
+	// One step (px): how far the western label box and the eastern doodle arc shift right, so the
+	// boxes and the arcs' top doodles don't overlap.
+	const STEP = 16;
+	function ringAngles(k, close, west) {
 		// Degrees, 0 = right, 90 = down.
 		// Pins close together (phones): A's label sits above and B's below, both facing the other
 		// pin, so A rings its lower side and B its upper side, each leaning away from the other.
@@ -531,9 +530,9 @@
 			const away = k === 'A' ? !west : west; // A leans east when it is east of B, etc.
 			return away ? base : base.map((a) => 180 - a);
 		}
-		// Otherwise the label is to the side: ring the opposite side.
-		const base = [255, 205, 155, 105];
-		return flip ? base.map((a) => 180 - a) : base;
+		// "(" on the western pin, ")" on the eastern one.
+		const left = [255, 205, 155, 105];
+		return west ? left : left.map((a) => 180 - a);
 	}
 
 	function pin(k) {
@@ -541,25 +540,43 @@
 		const x = sx(p);
 		const y = sy(p);
 		const o = at(offers[k === 'A' ? 'B' : 'A'].city);
-		const close = Math.abs(x - sx(o)) < 260 && Math.abs(y - sy(o)) < 70;
-		const nearEdge = (px) => px > cw - 190;
-		const flip = nearEdge(x) || (close && nearEdge(sx(o)));
-		const below = close && k === 'B';
+		const [ox, oy] = [sx(o), sy(o)];
+		const west = x < ox;
+		const close = Math.abs(x - ox) < 260 && Math.abs(y - oy) < 70;
+		// The label box (city, then salary), placed by a CSS translate from the pin's center.
+		let tx, ty;
+		if (close) {
+			// Phones: A's box above its pin and B's below (their doodles ring the other sides),
+			// running left instead of right near the right edge.
+			const nearEdge = (px) => px > cw - 190;
+			const flip = nearEdge(x) || nearEdge(ox);
+			tx = flip ? 'calc(-100% + 14px)' : '-14px';
+			ty = k === 'B' ? '16px' : 'calc(-100% - 16px)';
+		} else {
+			// Spread apart: both boxes at the same height above their pins, each running toward the
+			// other pin, since its doodle arc takes the outer side (and the arc's top doodle sits just
+			// past the pin on that side).
+			// The western box starts a step right of its pin, clear of its "(" arc's top doodle.
+			tx = west ? `${6 + STEP}px` : 'calc(-100% - 6px)';
+			ty = 'calc(-100% - 14px)';
+		}
 		return {
 			k,
 			x,
 			y,
 			o: offers[k],
 			shown: t >= landed(k),
-			anchor: flip ? 'end' : 'start',
-			dx: flip ? -16 : 16,
-			dy1: below ? '1.5em' : '-1em',
-			dy2: below ? '2.65em' : '0.15em',
+			tx,
+			ty,
+			// The eastern box casts its shadow to the left, away from its ")" arc.
+			shadowLeft: !close && !west,
 			icons: (KNOWN_FOR[offers[k].city] ?? []).map((ic, i, arr) => {
 				// Close pins (phones) get smaller doodles on a tighter ring.
-				const a = (ringAngles(k, flip, close, x < sx(o))[i % 4] * Math.PI) / 180;
+				const a = (ringAngles(k, close, west)[i % 4] * Math.PI) / 180;
 				const r = close ? 44 : RING;
-				return { ...ic, x: Math.cos(a) * r, y: Math.sin(a) * r, s: close ? 0.86 : 1.15, i: i + (k === 'B' ? arr.length : 0) };
+				// The eastern ")" arc sits a step right, so its top doodle clears the label box.
+				const nudge = !close && !west ? STEP : 0;
+				return { ...ic, x: Math.cos(a) * r + nudge, y: Math.sin(a) * r, s: close ? 0.86 : 1.15, i: i + (k === 'B' ? arr.length : 0) };
 			})
 		};
 	}
@@ -638,6 +655,7 @@
 {/snippet}
 
 <section class="hook" id="hook" bind:this={sec} style:height="calc(100svh + {SCROLL_VH}vh)">
+{#each STOPS as time (time)}<span class="stop" data-stop="top" style:top={stopTop(time)} aria-hidden="true"></span>{/each}
 <div class="stage" bind:this={stage}>
 	<!-- Act 3: the map, the search's result: hidden until it grows out of the taskbar search box. -->
 	<div class="map-box" class:shown={mapIn} class:live={interactive} style:clip-path={mapClip} bind:this={box}>
@@ -668,6 +686,13 @@
 					<path class="nation" d={outline} />
 				</g>
 			</g>
+			<!-- Only the two offer states are named (Michigan and New York), in screen space so the names
+			     stay the same size at every zoom. They fade in once both pins have settled. -->
+			<g class="state-names" class:shown={t >= tLink} aria-hidden="true">
+				{#each offerStates as s (s.id)}
+					<text x={sx(s.p)} y={sy(s.p)} dy="0.35em" text-anchor="middle">{s.name}</text>
+				{/each}
+			</g>
 			{#if link}
 				<line class="link" class:shown={t >= tLink} x1={link[0]} y1={link[1]} x2={link[2]} y2={link[3]} />
 				<text
@@ -675,7 +700,7 @@
 					class:shown={t >= tLink && !pinsClose}
 					x={(link[0] + link[2]) / 2}
 					y={(link[1] + link[3]) / 2}
-					dy="-0.7em"
+					dy="1.4em"
 					text-anchor="middle">≈ {miles.toLocaleString()} miles</text
 				>
 			{/if}
@@ -704,8 +729,6 @@
 				<g class="pin" transform="translate({l.x},{l.y})">
 					<g class="land" class:shown={l.shown}>
 						<circle r="10" fill="var(--{l.k.toLowerCase()})" />
-						<text class="lbl" text-anchor={l.anchor} x={l.dx} dy={l.dy1}>{l.o.city}, {data.byCity[l.o.city].state}</text>
-						<text class="lbl2" text-anchor={l.anchor} x={l.dx} dy={l.dy2}>Offer {l.k} · {f$(l.o.salary)}</text>
 					</g>
 					<!-- What the city is known for: pops in with the turn card. -->
 					{#each l.icons as ic (ic.label)}
@@ -729,6 +752,23 @@
 			{/each}
 		</svg>
 
+		<!-- Each pin's label (city, then offer and salary) in a small sketched box like the narration
+		     boxes, its shadow in the pin's color. HTML over the map, placed at the pin's screen point. -->
+		{#each pins as l (l.k)}
+			<div class="tag-at" style:left="{l.x}px" style:top="{l.y}px" style:transform="translate({l.tx}, {l.ty})" aria-hidden="true">
+				<div class="tag {l.k.toLowerCase()}" class:shown={l.shown}>
+					<SketchBox
+						r={12}
+						seed={BOX_SEED}
+						shadow="color-mix(in srgb, var(--{l.k.toLowerCase()}) 45%, transparent)"
+						shadowLeft={l.shadowLeft}
+					/>
+					<b>{l.o.city}</b>
+					<span>Offer {l.k} · {f$(l.o.salary)}</span>
+				</div>
+			</div>
+		{/each}
+
 		<div class="zoom" role="group" aria-label="Map controls" inert={!interactive}>
 			<button class="frame" aria-label="Frame the two offers" title="Frame the two offers" onclick={frameOffers}>
 				<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -748,7 +788,8 @@
 
 	<!-- The computer's taskbar, always along the bottom. -->
 	<div class="taskbar-wrap">
-		<Taskbar {query} focus={searching} bind:searchEl />
+		<!-- The open app switches from mail to the map as the search result grows into the map. -->
+		<Taskbar {query} focus={searching} app={mapIn ? 'map' : 'mail'} bind:searchEl />
 		<!-- Under the title card the taskbar dims too (the focus is the narration); during the
 		     search it stays bright, since the search box is the focus. -->
 		<div class="dim" style:opacity={titleO * DIM}></div>
@@ -820,11 +861,6 @@
 		</p>
 		<p class="title-hint">KEEP SCROLLING <span aria-hidden="true">↓</span></p>
 	</div>
-	{#if co}
-		<svg class="arrows" width={cw} height="100%" aria-hidden="true" style:opacity={co.o}>
-			{#each co.arrows as d, i (i)}<path {d} />{/each}
-		</svg>
-	{/if}
 	<div class="callout-live" aria-live="polite">
 		{#if co && callout}
 			<p
@@ -834,7 +870,7 @@
 				style:opacity={co.o}
 				style:--dy="{co.dy}px"
 			>
-				<SketchBox r={24} seed={BOX_SEED} ink="var(--accent)" shadow="var(--accent-soft)" />
+				<SketchBox r={24} seed={BOX_SEED} shadow="var(--accent)" />
 				{callout.text}
 			</p>
 		{/if}
@@ -848,6 +884,14 @@
 	.hook {
 		position: relative;
 		background: var(--page);
+	}
+	/* Invisible scroll spots for the story's < > buttons. */
+	.stop {
+		position: absolute;
+		left: 0;
+		width: 1px;
+		height: 1px;
+		pointer-events: none;
 	}
 	.stage {
 		/* The taskbar: its height, and its gap from the bottom (room for the story's step dots
@@ -922,14 +966,15 @@
 		stroke-linecap: round;
 		vector-effect: non-scaling-stroke;
 	}
+	/* The other metros: money-green dots, softened so the two offer pins lead. */
 	.metro {
-		fill: var(--series-soft);
+		fill: var(--accent);
 		stroke: #23211e;
 		stroke-width: 1.4;
 		outline: none;
 	}
 	.metro.dim {
-		fill-opacity: 0.45;
+		fill-opacity: 0.6;
 		stroke-opacity: 0.45;
 	}
 	.link {
@@ -942,9 +987,9 @@
 		transition: opacity 500ms;
 	}
 	.dist {
-		font-size: 13px;
-		font-weight: 650;
-		fill: var(--ink-2);
+		font-size: 20px;
+		font-weight: 700;
+		fill: var(--ink);
 		paint-order: stroke;
 		stroke: var(--page);
 		stroke-width: 4px;
@@ -977,20 +1022,64 @@
 	.land > circle {
 		filter: url(#doodle);
 	}
-	.lbl {
-		font-size: 14px;
-		font-weight: 650;
-		fill: var(--ink);
-		paint-order: stroke;
-		stroke: var(--page);
-		stroke-width: 4px;
+	/* Offer states' names: spaced caps in the display font, muted so the pins lead. */
+	.state-names {
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 400ms;
 	}
-	.lbl2 {
-		font-size: 12px;
-		fill: var(--ink-2);
+	/* After the second pin's 350 ms settle. */
+	.state-names.shown {
+		opacity: 1;
+		transition: opacity 500ms 350ms;
+	}
+	.state-names text {
+		font-family: var(--font-display);
+		font-size: 13px;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		fill: var(--muted);
 		paint-order: stroke;
 		stroke: var(--page);
-		stroke-width: 4px;
+		stroke-width: 3px;
+		stroke-linejoin: round;
+	}
+	/* The pins' label boxes: placed at the pin (.tag-at), then popping in with it (.tag), with the
+	   same small settle as the pin. */
+	.tag-at {
+		position: absolute;
+		z-index: 1;
+		pointer-events: none;
+	}
+	.tag {
+		position: relative;
+		/* SketchBox draws behind the text. */
+		isolation: isolate;
+		display: flex;
+		flex-direction: column;
+		padding: 7px 14px 8px;
+		line-height: 1.2;
+		white-space: nowrap;
+		opacity: 0;
+		transform: scale(0.6);
+		transition:
+			opacity 150ms,
+			transform 350ms cubic-bezier(0.3, 1.8, 0.5, 1);
+	}
+	.tag.shown {
+		opacity: 1;
+		transform: none;
+	}
+	.tag b {
+		font-family: var(--font-display);
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--ink);
+	}
+	.tag span {
+		font-size: 15px;
+		color: var(--ink-2);
 	}
 	/* The known-for doodles: hand-drawn style (dark ink outlines, flat fills in shades of the pin's
 	   color, a lighter highlight, small ink ticks), popping out from the pin. */
@@ -1274,11 +1363,11 @@
 		font-size: 12px;
 		font-weight: 700;
 		letter-spacing: 0.14em;
-		color: var(--accent);
+		color: var(--accent-ink);
 	}
 
 	/* ---------- the salary spotlight ---------- */
-	/* Over the inbox and taskbar, under the narration and its arrows. */
+	/* Over the inbox and taskbar, under the narration. */
 	.spot {
 		position: absolute;
 		inset: 0;
@@ -1327,25 +1416,9 @@
 		text-transform: uppercase;
 		/* Same look as the "Imagine this" label. */
 		font-weight: 700;
-		color: var(--accent);
+		color: var(--accent-ink);
 	}
-	/* Callouts: a short line beside the action, with hand-drawn arrows to what it's about. */
-	.arrows {
-		position: absolute;
-		left: 0;
-		top: 0;
-		z-index: 7;
-		overflow: visible;
-		pointer-events: none;
-	}
-	.arrows path {
-		fill: none;
-		stroke: var(--accent);
-		stroke-width: 2.4;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		filter: url(#doodle);
-	}
+	/* Callouts: a short line beside the action. */
 	.callout {
 		position: absolute;
 		z-index: 7;
@@ -1353,8 +1426,8 @@
 		max-width: min(380px, calc(100vw - 32px));
 		margin: 0;
 		padding: 18px 26px;
-		/* A sketched box (SketchBox) behind the text, pen-drawn in the arrows' accent with a soft
-		   accent shadow. The arrows do the pointing, so no tail. */
+		/* A sketched box (SketchBox) behind the text: black ink outline, money-green shadow (the same
+		   as the "Imagine this" card's). No tail or arrows: it sits beside what it's about. */
 		isolation: isolate;
 		font-family: var(--font-display);
 		font-weight: 700;

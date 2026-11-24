@@ -2,17 +2,45 @@
 	import { onMount } from 'svelte';
 	import scrollama from 'scrollama';
 
-	// Scrollytelling index for the whole story. Each step is one storyboard beat, rendered as a full
-	// scene by the `scene` snippet. The step crossing the middle of the viewport is `active`; the
-	// indicator highlights it, and its buttons scroll to a scene so Scrollama updates the index
-	// exactly as if the reader had scrolled there.
+	// The whole story's scenes, each rendered by the `scene` snippet. The scene crossing the middle
+	// of the viewport is `active` (the others dim). The < > buttons step to the previous / next
+	// change in the story, not to storyboard sections: every element marked [data-stop] in the page
+	// is one change (the hook's narration moments, each text card of the later sections).
+	//   data-stop="top"   scroll so the spot sits at the top of the screen (the hook's moments)
+	//   data-stop="card"  scroll so the card sits just above the middle, where it becomes active
 	let { steps, active = $bindable(0), scene } = $props();
 
 	let els = $state([]);
 	// Which scenes currently cross the middle line. None do on the title screen or the footer,
-	// and the indicator hides then.
+	// and the buttons hide then.
 	let inBand = $state([]);
 	let shown = $derived(inBand.some(Boolean));
+	let canPrev = $state(false);
+	let canNext = $state(true);
+
+	// Every stop's scroll position, in page order.
+	function stops() {
+		return [...document.querySelectorAll('[data-stop]')]
+			.map((el) => {
+				const top = el.getBoundingClientRect().top + scrollY;
+				return Math.max(0, Math.round(el.dataset.stop === 'card' ? top - innerHeight * 0.4 : top));
+			})
+			.sort((a, b) => a - b);
+	}
+	// A few px of slack, so a stop just reached doesn't count as still ahead.
+	const SLACK = 8;
+	function updateButtons() {
+		const ys = stops();
+		canPrev = ys.some((y) => y < scrollY - SLACK);
+		canNext = ys.some((y) => y > scrollY + SLACK);
+	}
+	function go(dir) {
+		const ys = stops();
+		const y = dir > 0 ? ys.find((v) => v > scrollY + SLACK) : ys.findLast((v) => v < scrollY - SLACK);
+		if (y == null) return;
+		const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+		scrollTo({ top: y, behavior: smooth ? 'smooth' : 'auto' });
+	}
 
 	onMount(() => {
 		// Scrollama fires onStepEnter / onStepExit as a scene crosses the trigger line at the
@@ -26,20 +54,30 @@
 			})
 			.onStepExit(({ index }) => (inBand[index] = false));
 
+		// Keep the buttons' enabled state in step with the scroll (one update per frame at most).
+		let queued = false;
+		const onScroll = () => {
+			if (queued) return;
+			queued = true;
+			requestAnimationFrame(() => {
+				queued = false;
+				updateButtons();
+			});
+		};
 		// The trigger line is measured from the window height, so re-measure when it changes.
-		const onResize = () => scroller.resize();
-		window.addEventListener('resize', onResize);
+		const onResize = () => {
+			scroller.resize();
+			onScroll();
+		};
+		addEventListener('scroll', onScroll, { passive: true });
+		addEventListener('resize', onResize);
+		updateButtons();
 		return () => {
-			window.removeEventListener('resize', onResize);
+			removeEventListener('scroll', onScroll);
+			removeEventListener('resize', onResize);
 			scroller.destroy();
 		};
 	});
-
-	function goTo(i) {
-		const el = els[Math.max(0, Math.min(steps.length - 1, i))];
-		const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-		el?.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
-	}
 </script>
 
 {#each steps as s, i (s.id)}
@@ -48,21 +86,11 @@
 	</div>
 {/each}
 
-<nav class="controls" class:shown aria-label="Story steps" aria-hidden={!shown} inert={!shown}>
-	<button class="arrow" aria-label="Previous step" disabled={active === 0} onclick={() => goTo(active - 1)}>
+<nav class="controls" class:shown aria-label="Story navigation" aria-hidden={!shown} inert={!shown}>
+	<button class="arrow" aria-label="Previous part of the story" disabled={!canPrev} onclick={() => go(-1)}>
 		<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
 	</button>
-	{#each steps as s, i (s.id)}
-		<button
-			class="dot"
-			aria-label="Step {i + 1} of {steps.length}"
-			aria-current={i === active ? 'step' : undefined}
-			onclick={() => goTo(i)}
-		>
-			<span class="circle"></span>
-		</button>
-	{/each}
-	<button class="arrow" aria-label="Next step" disabled={active === steps.length - 1} onclick={() => goTo(active + 1)}>
+	<button class="arrow" aria-label="Next part of the story" disabled={!canNext} onclick={() => go(1)}>
 		<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
 	</button>
 </nav>
@@ -103,37 +131,9 @@
 		cursor: pointer;
 		color: var(--ink-2);
 	}
-	/* Each step is a circle; the active one fills in. The button pads it to a 28px target. */
-	.dot {
-		position: relative;
-		display: flex;
-		align-items: center;
-		padding: 7px;
-		border: 0;
-		background: none;
-	}
-	.circle {
-		width: 14px;
-		height: 14px;
-		border-radius: 50%;
-		border: 1.5px solid var(--axis);
-		background: var(--control);
-		transition:
-			background 200ms,
-			border-color 200ms,
-			transform 200ms;
-	}
-	.dot:hover:not([aria-current]) .circle {
-		border-color: var(--ink-2);
-	}
-	.dot[aria-current='step'] .circle {
-		background: var(--control-active);
-		border-color: var(--control-active);
-		transform: scale(1.2);
-	}
 	.arrow {
-		width: 28px;
-		height: 28px;
+		width: 32px;
+		height: 32px;
 		padding: 0;
 		border: 0;
 		background: none;

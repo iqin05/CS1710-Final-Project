@@ -6,13 +6,16 @@
 	// types the search query by scroll.
 	//   query   what's typed in the search box so far ('' shows the placeholder)
 	//   focus   the search box is active (ring + blinking caret)
+	//   app     the open app: 'mail' for the inbox, 'map' once the search result becomes the map
 	// `searchEl` (bindable) is the search box, which the hook's callout and map panel aim for.
-	let { query = '', focus = false, searchEl = $bindable() } = $props();
+	let { query = '', focus = false, app = 'mail', searchEl = $bindable() } = $props();
 
 	const ICON = {
 		launcher: 'M6 6h.01M12 6h.01M18 6h.01M6 12h.01M12 12h.01M18 12h.01M6 18h.01M12 18h.01M18 18h.01',
 		search: 'M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14zM16 16l5 5',
 		mail: 'M3 6h18v12H3zM3 6l9 7 9-7',
+		// A folded paper map: three panels.
+		map: 'M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5zM9 4v13.5M15 6.5V20',
 		globe: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18zM3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18',
 		folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
 		notes: 'M6 3h9l4 4v14H6zM15 3v4h4M9 12h6M9 16h6'
@@ -32,11 +35,12 @@
 			{#if query}
 				<span class="q">{query}</span>
 			{:else}
-				<span class="ph">Search</span>
+				<span class="ph">Search the internet</span>
 			{/if}
 			{#if focus}<span class="caret"></span>{/if}
 		</span>
-		<span class="app on">{@render icon('mail')}</span>
+		<span class="app" class:on={app === 'mail'}>{@render icon('mail')}</span>
+		<span class="app" class:on={app === 'map'}>{@render icon('map')}</span>
 		<span class="app">{@render icon('globe')}</span>
 		<span class="app">{@render icon('folder')}</span>
 		<span class="app">{@render icon('notes')}</span>

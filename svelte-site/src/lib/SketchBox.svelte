@@ -6,7 +6,15 @@
 	// `isolation: isolate` so the box sits behind the parent's text.
 	//   ink, fill, shadow   colors;  r: corner radius (capped at half the height)
 	//   seed                varies the hand-drawn wobble between boxes
-	let { ink = '#23211e', fill = 'var(--surface)', shadow = 'var(--grid)', r = 20, seed = 1 } = $props();
+	//   shadowLeft          cast the shadow down-left instead of down-right
+	let {
+		ink = '#23211e',
+		fill = 'var(--surface)',
+		shadow = 'var(--grid)',
+		r = 20,
+		seed = 1,
+		shadowLeft = false
+	} = $props();
 
 	let w = $state(0);
 	let h = $state(0);
@@ -68,7 +76,7 @@
 <div class="sketch" aria-hidden="true" bind:clientWidth={w} bind:clientHeight={h}>
 	{#if w && h}
 		<svg width={w} height={h} style:--sk-ink={ink} style:--sk-fill={fill} style:--sk-shadow={shadow}>
-			<path class="shadow" d={fillD} transform="translate({SHADOW},{SHADOW})" />
+			<path class="shadow" d={fillD} transform="translate({shadowLeft ? -SHADOW : SHADOW},{SHADOW})" />
 			<path class="fill" d={fillD} />
 			<path class="pen" d={pass1} />
 			<path class="pen second" d={pass2} />

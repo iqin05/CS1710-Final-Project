@@ -332,10 +332,10 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* The doodled bundle: ink outlines over flat blue-green bills with an amber strap. Chosen to hold
-	   up under red-green color blindness: a green bill and a cream strap become nearly the same color
-	   under protanopia (ΔE ≈ 3), while blue-green against amber sits on the blue-yellow axis those
-	   viewers still see (ΔE ≈ 64 under protanopia and deuteranopia). */
+	/* The doodled bundle: ink outlines over flat blue-green bills with a dark money-green strap (the
+	   "Imagine this" label's green, --accent-ink). The strap stands apart from the pale bill by
+	   lightness, which color blindness doesn't change, so it holds up under protanopia and
+	   deuteranopia too. */
 	.money {
 		filter: url(#doodle);
 	}
@@ -381,7 +381,7 @@
 		stroke-linecap: round;
 	}
 	.m-strap {
-		fill: #e9b949;
+		fill: var(--accent-ink);
 	}
 	.bundle > g {
 		transform-box: fill-box;

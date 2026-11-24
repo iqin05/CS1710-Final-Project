@@ -78,7 +78,7 @@
 	// so no region looks heavier or more important than another: regions are categories, not a
 	// ranking. Checked with the dataviz skill's validator on this surface (--pairs all): every check
 	// passes outright, color-blind separation ΔE 8.4 and every mark at least 3:1, so color carries
-	// the regions without a second encoding. Blue and orange mean Offer A / B elsewhere, so the offer
+	// the regions without a second encoding. Pink and blue mean Offer A / B elsewhere, so the offer
 	// cities' own regions (Northeast, Midwest) get rose and green, and the offers here are marked with
 	// a dark ring, a larger dot and a label instead of their colors.
 	const REGION_COLOR = { Northeast: '#ae5ea8', Midwest: '#019f68', South: '#bb6802', West: '#5285d9' };

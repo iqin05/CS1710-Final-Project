@@ -6,7 +6,8 @@
 	// NEXT STEPS: the two offers as one-month paycheck breakdowns at the entered salaries.
 	let { data, offers, setOffer } = $props();
 
-	const COL = { rent: '#2f4f7f', rest: '#7f9cc4', tax: '#c3c2b7', left: '#3d6fb0', short: '#c0392b' };
+	// Muted blues for the budget (rent darkest, everyday costs lightest), red for a shortfall.
+	const COL = { rent: 'var(--blue-dark)', rest: 'var(--blue-light)', tax: '#c3c2b7', left: 'var(--blue)', short: 'var(--neg)' };
 
 	let A = $derived(calc(data, offers.A.city, offers.A.salary));
 	let B = $derived(calc(data, offers.B.city, offers.B.salary));
@@ -106,7 +107,7 @@
 		transition: width 300ms;
 	}
 	.seg-bar div.short {
-		outline: 2px dashed #c0392b;
+		outline: 2px dashed var(--neg);
 		outline-offset: -2px;
 	}
 	.k {

@@ -9,20 +9,42 @@
 	--grid: #e1e0d9;
 	--axis: #c3c2b7;
 	--border: rgba(11, 11, 11, 0.1);
-	--series: #3d6fb0;
-	--series-soft: #a9bfdb;
-	--accent: #c4612f;
-	--accent-soft: #e8c4b1;
-	--a: #3d6fb0;
-	--b: #c4612f;
+	/* Story colors: palette 4 (storyboard/color palette 4.png) made richer and darker, plus the
+	   title screen's money green for the narration.
+	     New York (offer A)  pink #8e2955: palette 4's pink hue (334°), deepened (HSL S55 L36)
+	     Detroit (offer B)   blue #296bc2: palette 4's blue hue (214°), deepened (S65 L46)
+	     narration / story   money green #6fa8a1: the edge color of the title screen's cash bundles,
+	                         for shadows, arrows, outlines and the unread dot. Its text uses the same
+	                         hue deepened, #207e73 (4.5:1 on the cream page; #6fa8a1 is 2.5:1). The
+	                         soft callout shadows use the bundles' bill-face color, #c6e3e0.
+	     shortfall           red #c0392b, reserved for money short, used nowhere else
+	   Under simulated protanopia and deuteranopia (Machado et al. 2009, CIEDE2000) the colors stay
+	   apart: NY vs Detroit 36.5 / 22.8 / 28.6 (normal / protan / deutan); the money green stays 27+
+	   from both offers and 30+ from the red. Muted blues for what used to be a default dark blue
+	   (inbox, controls, neutral data); creams and ink stay. */
+	--pink: #8e2955;
+	--sky: #296bc2;
+	--money: #6fa8a1;
+	--money-pale: #c6e3e0;
+	--money-ink: #207e73;
+	--blue-dark: #3c4048;
+	--blue: #6b7280;
+	--blue-light: #a0a6b0;
+	--series: var(--blue);
+	--series-soft: var(--blue-light);
+	--accent: var(--money);
+	--accent-soft: var(--money-pale);
+	--accent-ink: var(--money-ink);
+	--a: var(--pink);
+	--b: var(--sky);
 	--neg: #c0392b;
-	--pos: #3d6fb0;
+	--pos: var(--blue);
 	--mid: #f0efec;
 	--control: #fff;
-	--control-active: #2f4f7f;
+	--control-active: var(--blue-dark);
 	--control-active-ink: #fff;
 	--tip-bg: #fff;
-	--hero-bg: #1d2a3d;
+	--hero-bg: var(--blue-dark);
 	--hero-ink: #f4f1ea;
 	/* Fonts: a marker face for titles, headings and larger text; a friendly, readable face for body
 	   text; and the system face for computer screens (the hook's inbox and taskbar) and chart
@@ -72,7 +94,7 @@ a {
 	font-size: 11px;
 	letter-spacing: 0.14em;
 	text-transform: uppercase;
-	color: var(--accent);
+	color: var(--accent-ink);
 	font-weight: 700;
 	margin: 0 0 8px;
 }
@@ -287,7 +309,7 @@ svg text {
 	fill: var(--ink-2);
 }
 .hbar text.name.sel {
-	fill: var(--accent);
+	fill: var(--accent-ink);
 	font-weight: 650;
 }
 .hbar text.v {

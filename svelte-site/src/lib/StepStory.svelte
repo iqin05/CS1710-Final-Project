@@ -43,7 +43,8 @@
 	<div class="layout" class:stacked>
 		<div class="steps">
 			{#each steps as s, i (s.key)}
-				<div class="step" class:active={i === active} bind:this={stepEls[i]}>
+				<!-- data-stop: each card is a stop for the story's < > buttons (Scrolly.svelte). -->
+				<div class="step" class:active={i === active} data-stop="card" bind:this={stepEls[i]}>
 					<div class="card text">{@render text(s, i)}</div>
 					{#if stacked}
 						<div class="inline-vis">{@render graphic(s, i)}</div>

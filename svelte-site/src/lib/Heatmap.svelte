@@ -25,10 +25,10 @@
 	let minJobs = $state(1000);
 	let sortBy = $state(ALL);
 
-	// Diverging: red for a monthly shortfall, blue for savings, neutral at $0.
+	// Diverging: red for a monthly shortfall, the dark muted blue for savings, neutral at $0.
 	const color = (v) => {
 		const t = Math.max(-1, Math.min(1, v / 3200));
-		return t < 0 ? d3.interpolateLab('#f0efec', '#d9534f')(-t) : d3.interpolateLab('#f0efec', '#4f7fc0')(t);
+		return t < 0 ? d3.interpolateLab('#f0efec', '#c0392b')(-t) : d3.interpolateLab('#f0efec', '#3c4048')(t);
 	};
 	const val = (c, f) => {
 		if (f === ALL) return { v: c.savings, jobs: c.jobs };
@@ -159,7 +159,7 @@
 		<div class="legend-ramp">
 			<span>$2,900 short</span><i></i><span>$2,900 left over</span>
 			<span class="explain"
-				>Red cells are a monthly shortfall (the budget costs more than take-home); blue cells have money left over. Hatched = too few jobs or no data.</span
+				>Red cells are a monthly shortfall (the budget costs more than take-home); gray-blue cells have money left over. Hatched = too few jobs or no data.</span
 			>
 		</div>
 	</div>
@@ -252,7 +252,7 @@
 		outline: 1px solid var(--axis);
 	}
 	tr.hl td:first-child {
-		color: var(--accent);
+		color: var(--accent-ink);
 		font-weight: 650;
 	}
 	.legend-ramp {

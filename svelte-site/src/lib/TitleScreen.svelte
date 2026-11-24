@@ -95,9 +95,6 @@
 	let maxRows = $derived(Math.max(...piles.map((p) => p.rows)));
 	let VW = $derived(maxW * (BW + GAP) - GAP);
 	let VH = $derived(maxRows * (BH + GAP) - GAP);
-	let fallEnd = $derived(
-		Math.max(0, ...piles.flatMap((p) => p.bundles.filter((b) => b.falls).map((b) => b.start + b.dur)))
-	);
 
 	// Scroll progress through the pinned title screen: 0 at the top, 1 when it starts to scroll away.
 	let el;
@@ -161,7 +158,6 @@
 	const done = (p) => p.bundles.every((b) => !b.falls || q(b) === 1);
 
 	let labelsIn = $derived(clamp01(progress / 0.05));
-	let settled = $derived(clamp01((progress - fallEnd - 0.02) / 0.08));
 	let cueOut = $derived(clamp01(progress / 0.05));
 </script>
 
@@ -218,8 +214,8 @@
 			{/each}
 
 			<div class="center">
-				<h1>Beyond the First Paycheck</h1>
-				<p class="after" style:opacity={settled} aria-hidden={settled < 0.5}>
+				<h1>Beyond the<br />First Paycheck</h1>
+				<p class="after">
 					What's left after a year of everyday living?
 				</p>
 			</div>
@@ -267,11 +263,9 @@
 		text-align: center;
 	}
 	h1 {
-		font-size: clamp(40px, 6vw, 88px);
+		font-size: clamp(36px, 5.4vw, 80px);
 		line-height: 1.02;
-		letter-spacing: -0.025em;
-		/* Two lines: "Beyond the / First Paycheck". */
-		max-width: 12ch;
+		/* Two lines, "Beyond the / First Paycheck" (the break is in the markup). */
 		margin: 0 auto;
 	}
 	.after {
@@ -327,8 +321,9 @@
 		color: var(--ink-2);
 	}
 	.amt {
-		font-size: 24px;
-		font-weight: 650;
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 22px;
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
 	}

@@ -12,7 +12,7 @@
 		'Engineering & Architecture',
 		'Healthcare',
 		'Science',
-		'Business & Finance',
+		'Business and Finance',
 		'Sales',
 		'Education',
 		'Arts, Design & Media',

@@ -5,8 +5,13 @@ import { asset } from '$app/paths';
 // site/build_data.py, but reads the CSVs directly instead of a generated data.js.
 
 export const ALL = 'All fields';
-/** The story's field: both offers are entry-level Business & Finance jobs, for every reader. */
-export const STORY_FIELD = 'Business & Finance';
+/** The story's field: both offers are entry-level Business and Finance jobs, for every reader. */
+export const STORY_FIELD = 'Business and Finance';
+
+// Field names as the site shows them, where they differ from the CSV's (renamed once, on load, so
+// every view and lookup uses the same name).
+const FIELD_NAMES = { 'Business & Finance': 'Business and Finance' };
+const fieldName = (f) => FIELD_NAMES[f] ?? f;
 export const REGIONS = ['Northeast', 'Midwest', 'South', 'West'];
 
 export const f$ = d3.format('$,.0f');
@@ -92,7 +97,7 @@ export async function loadData() {
 	const cities = cityRows.map(cityRow);
 	const byField = fieldIndex(fieldRows);
 	// Alphabetical, with the catch-all "Other" last.
-	const fields = [...new Set(fieldRows.map((r) => r.field))].filter((f) => f !== 'Other').sort();
+	const fields = [...new Set(fieldRows.map((r) => fieldName(r.field)))].filter((f) => f !== 'Other').sort();
 	fields.push('Other');
 	return { cities, byCity: Object.fromEntries(cities.map((c) => [c.city, c])), byField, fields };
 }
@@ -101,7 +106,7 @@ export async function loadData() {
 export function fieldIndex(fieldRows) {
 	const byField = {};
 	for (const r of fieldRows) {
-		(byField[r.city] ??= {})[r.field] = {
+		(byField[r.city] ??= {})[fieldName(r.field)] = {
 			salary: num(r.entry_salary_p25),
 			take: num(r.est_monthly_take_home),
 			savings: num(r.est_monthly_savings),
@@ -202,7 +207,7 @@ export function titleEcon(data, offers) {
 }
 
 /**
- * The story's pair, the same for every reader: New York vs. Detroit, both entry-level Business &
+ * The story's pair, the same for every reader: New York vs. Detroit, both entry-level Business and
  * Finance offers at that city × field's typical (25th-percentile) salary. Needs `data.byField`.
  */
 export const defaultOffers = (data) => ({

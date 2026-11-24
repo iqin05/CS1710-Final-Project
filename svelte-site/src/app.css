@@ -24,6 +24,12 @@
 	--tip-bg: #fff;
 	--hero-bg: #1d2a3d;
 	--hero-ink: #f4f1ea;
+	/* Fonts: a marker face for titles, headings and larger text; a friendly, readable face for body
+	   text; and the system face for computer screens (the hook's inbox and taskbar) and chart
+	   labels, where small sizes and lined-up numbers matter. */
+	--font-display: 'Comic Relief', 'Figtree', system-ui, sans-serif;
+	--font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-ui: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 * {
 	box-sizing: border-box;
@@ -43,18 +49,15 @@ body {
 	margin: 0;
 	background: var(--page);
 	color: var(--ink);
-	font:
-		15px/1.5 system-ui,
-		-apple-system,
-		'Segoe UI',
-		sans-serif;
+	font: 15px/1.55 var(--font-body);
 	-webkit-font-smoothing: antialiased;
 }
+/* Comic Relief comes in regular (400) and bold (700); headings use the bold. */
 h1,
 h2,
 h3 {
-	letter-spacing: -0.01em;
-	font-weight: 650;
+	font-family: var(--font-display);
+	font-weight: 700;
 	line-height: 1.2;
 }
 a {
@@ -103,7 +106,7 @@ section.story .lede {
 	min-width: 0;
 }
 .card h3 {
-	font-size: 15px;
+	font-size: 16px;
 	margin: 0 0 2px;
 }
 .card .sub {
@@ -209,8 +212,9 @@ svg {
 	height: auto;
 	overflow: visible;
 }
+/* Chart text (axes, labels, values) stays in the system face: small and numeric. */
 svg text {
-	font-family: inherit;
+	font-family: var(--font-ui);
 }
 .axis text {
 	fill: var(--muted);

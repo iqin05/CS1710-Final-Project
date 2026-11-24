@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import * as d3 from 'd3';
 import { cityRow, fieldIndex, defaultOffers, titleEcon } from '#lib/data.js';
 
-// Runs once at build time (the page is prerendered). Works out the two story offers (Business &
+// Runs once at build time (the page is prerendered). Works out the two story offers (Business and
 // Finance, 25th-percentile salary) from static/cities.csv and static/city_by_field.csv, plus what
 // each keeps in a year and its budget, so the title screen can draw
 // its piles of cash in the very first paint, before the browser has downloaded the scripts and the

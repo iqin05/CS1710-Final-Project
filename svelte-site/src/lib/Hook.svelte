@@ -358,7 +358,7 @@
 		const [h1, h2] = [h(0.45), h(-0.45)];
 		return `M${sx0},${sy0} Q${cx},${cy} ${ex},${ey} M${h1[0]},${h1[1]} L${ex},${ey} L${h2[0]},${h2[1]}`;
 	}
-	const CALLOUT_W = 330;
+	const CALLOUT_W = 380;
 	// How far each callout box overlaps the start of its arrows.
 	const ARROW_TUCK = 16;
 	// Where each callout sits and what its arrows point at, in stage pixels.
@@ -370,8 +370,14 @@
 			// the screen above the letter (phones), it drops into the letter's empty lower part.
 			const [a, b] = [rel(els.row.A), rel(els.row.B)];
 			const stacked = a.w > cw * 0.8;
-			const x = clampX(a.x + a.w / 2);
-			const y = stacked ? (() => { const r = rel(els.reading); return r.y + r.h * 0.62; })() : a.y + a.h + 58;
+			// Right-aligned with the list (when it sits beside the letter), so a box wider than the
+			// list spills into the empty space under the folders rather than over the letter text.
+			const x = clampX(stacked ? a.x + a.w / 2 : a.x + a.w - half);
+			// If the box would still reach over the letter (no folder column to spill into), it drops
+			// into the letter's empty lower part instead, as on phones.
+			const r = rel(els.reading);
+			const overLetter = stacked || x + half > r.x + 12;
+			const y = overLetter ? r.y + r.h * 0.62 : a.y + a.h + 58;
 			return { x, y, place: 'below', arrows: [arrow([x - half * 0.55, y - 6], [b.x + 16, b.y + 36], 0.12)] };
 		}
 		if (c.id === 'salaries') {
@@ -1249,9 +1255,9 @@
 		left: 50%;
 		top: 44%;
 		z-index: 8;
-		width: min(620px, calc(100% - 40px));
+		width: min(660px, calc(100% - 40px));
 		transform: translate(-50%, -50%);
-		padding: 32px 40px 26px;
+		padding: 38px 46px 30px;
 		/* A sketched box (SketchBox) behind the text, like the turn card: ink outline, gray shadow. */
 		isolation: isolate;
 		pointer-events: none;
@@ -1263,9 +1269,10 @@
 	}
 	.title-text {
 		margin: 0;
-		font-size: 26px;
-		line-height: 1.3;
-		font-weight: 650;
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 27px;
+		line-height: 1.4;
 		letter-spacing: -0.01em;
 		color: var(--ink);
 	}
@@ -1295,15 +1302,16 @@
 		position: absolute;
 		z-index: 7;
 		width: max-content;
-		max-width: min(330px, calc(100vw - 32px));
+		max-width: min(380px, calc(100vw - 32px));
 		margin: 0;
-		padding: 14px 22px;
+		padding: 18px 26px;
 		/* A sketched box (SketchBox) behind the text, pen-drawn in the arrows' accent with a soft
 		   accent shadow. The arrows do the pointing, so no tail. */
 		isolation: isolate;
-		font-size: 16px;
-		line-height: 1.4;
-		font-weight: 550;
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 18px;
+		line-height: 1.5;
 		color: var(--ink);
 		pointer-events: none;
 		transform: translate(-50%, var(--dy));
@@ -1345,10 +1353,11 @@
 			display: none;
 		}
 		.title-text {
-			font-size: 21px;
+			font-size: 23px;
 		}
 		.callout {
-			font-size: 15px;
+			font-size: 17px;
+			padding: 16px 22px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

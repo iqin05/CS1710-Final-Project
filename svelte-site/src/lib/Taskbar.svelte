@@ -54,6 +54,7 @@
 		padding: 0 14px;
 		background: #111;
 		color: #e6e6e6;
+		font-family: var(--font-ui);
 		font-size: 13px;
 		user-select: none;
 	}

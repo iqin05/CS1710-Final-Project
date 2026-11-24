@@ -149,6 +149,13 @@
 		overflow: hidden;
 		font-size: 13px;
 		user-select: none;
+		/* The inbox keeps the site's system font (no display face), headings included. */
+		font-family: var(--font-ui);
+	}
+	.mail :is(h1, h2, h3) {
+		font-family: inherit;
+		font-weight: 650;
+		letter-spacing: -0.01em;
 	}
 	.ico {
 		width: 16px;

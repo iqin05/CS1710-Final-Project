@@ -329,7 +329,9 @@
 		color: var(--muted);
 	}
 	.left b {
-		font-size: 28px;
+		font-family: var(--font-display);
+		font-weight: 700;
+		font-size: 26px;
 		line-height: 1.15;
 		color: var(--ink);
 		font-variant-numeric: tabular-nums;
